@@ -1,0 +1,21 @@
+name: macOS checks
+on:
+  push:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # verified v4 ref, 2026-11-10
+      - name: Toolchain
+        run: swift --version
+      - name: Unit and executable integration tests
+        run: zsh scripts/test.sh
+      - name: Local app bundle
+        run: zsh scripts/build.sh release
+      - name: Bundle integrity
+        run: codesign --verify --deep --strict './build/Agent Attention Router.app'
+      # Real Codex, notifications and Spaces tests need a logged-in interactive Mac.
+      # This workflow does not publish, tag, upload artifacts or mutate a repository.

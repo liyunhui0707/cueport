@@ -1,0 +1,11 @@
+.build/
+build/
+.DS_Store
+*.xcuserstate
+.env
+.env.*
+!.env.example
+!.env.sample
+!.env.template
+secrets/
+__pycache__/

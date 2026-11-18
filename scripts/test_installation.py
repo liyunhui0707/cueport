@@ -70,6 +70,21 @@ def main():
             except ValueError as error:
                 assert "legacy Codex" in str(error)
         assert legacy.exists() and not renamed.exists()
+        command = "'" + str(legacy / "Contents/MacOS/aar") + "' hook"
+        with patch.object(installer, "configured_hook_commands", return_value=[command]):
+            try:
+                installer.install(options.app, renamed, digest, legacy)
+                raise AssertionError("Configured Hook dependency accepted")
+            except ValueError as error:
+                assert "Configured Codex Hooks" in str(error)
+        assert legacy.exists() and not renamed.exists()
+        with patch.object(installer, "configured_hook_commands", side_effect=[[], [command]]):
+            try:
+                installer.install(options.app, renamed, digest, legacy)
+                raise AssertionError("New Hook dependency during staging accepted")
+            except ValueError as error:
+                assert "during staging" in str(error)
+        assert legacy.exists() and not renamed.exists()
         real_validate = installer.validate
         def fail_renamed(app):
             if app == renamed:
@@ -105,7 +120,7 @@ def main():
             pass
         print(json.dumps({"actual_signed_install": "pass", "update_new_inodes_and_backup": "pass",
                           "application_rollback": "pass", "failed_swap_restores_previous_app": "pass",
-                          "running_receiver_refused": "pass", "changed_input_and_symlink_refused": "pass",
+                          "running_receiver_refused": "pass", "configured_hooks_refuse_legacy_rename": "pass", "hooks_changed_during_staging_refused": "pass", "changed_input_and_symlink_refused": "pass",
                           "data_sentinel_preserved": True, "real_preferences_or_sessions_modified": False}, indent=2))
 
 

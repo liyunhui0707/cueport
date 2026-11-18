@@ -11,6 +11,7 @@ import os
 from pathlib import Path
 import plistlib
 import subprocess
+from manage_install import configured_hook_commands, hooks_reference_application
 
 
 def contained(path, root):
@@ -64,11 +65,12 @@ def protected(app, paths):
     return any(contained(Path(p), app) for p in paths)
 
 
-def plan(build_root, paths=None):
+def plan(build_root, paths=None, hook_commands=None):
     build_root = build_root.absolute(); safe(build_root)
     if build_root.name != "build" or not build_root.is_dir():
         raise ValueError("Select this project's build directory")
     paths = active_paths() if paths is None else paths
+    hook_commands = configured_hook_commands() if hook_commands is None else hook_commands
     entries = []
     apps = []
     for directory, names, _ in os.walk(build_root, followlinks=False):
@@ -92,6 +94,8 @@ def plan(build_root, paths=None):
             entries.append({"source": str(app), "status": "foreign-retained"}); continue
         if protected(app, paths):
             entries.append({"source": str(app), "status": "active-retained"}); continue
+        if hooks_reference_application(app, hook_commands):
+            entries.append({"source": str(app), "status": "configured-hook-retained"}); continue
         destination = build_root / "archive.noindex/apps" / app.relative_to(build_root)
         entries.append({"source": str(app), "destination": str(destination), "fingerprint": fingerprint(app), "status": "planned"})
     return {"schema": 1, "build_root": str(build_root), "recoverable_archive_only": True, "entries": entries}
@@ -112,12 +116,15 @@ def apply(reviewed, receipt_file):
             raise ValueError("Unexpected archive destination")
         safe(source); safe(destination)
     paths = active_paths()
+    hook_commands = configured_hook_commands()
     for item in reviewed["entries"]:
         if item["status"] != "planned":
             continue
         source, destination = Path(item["source"]), Path(item["destination"])
         if protected(source, paths):
             item["status"] = "became-active-retained"
+        elif hooks_reference_application(source, hook_commands):
+            item["status"] = "became-configured-retained"
         elif not source.exists() and destination.exists() and fingerprint(destination) == item["fingerprint"]:
             item["status"] = "archived"
         elif destination.exists() or not source.exists() or fingerprint(source) != item["fingerprint"]:

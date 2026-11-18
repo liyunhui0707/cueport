@@ -184,3 +184,13 @@ Existing remembered bridge folders are kept. A new setup uses
 profile is a separate stopped-profile operation with a reviewed fingerprint;
 never copy a stale backup over current data. Old release assets retain their
 original names and checksums.
+
+
+Configured global Codex Hooks are also application dependencies. If a Hook still
+references an old app/helper, the first-name-change installer refuses the rename,
+and the recoverable cleanup tool retains it even when no process is running.
+Keep that old dependency until its Hook command is separately reviewed/moved
+through the normal Codex Hook workflow. The tools do not rewrite Hook commands
+or trust settings. Custom Hook sources outside the default global hooks.json
+still require explicit review; never delete an old executable merely because
+its terminal windows are closed.

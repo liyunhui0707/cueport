@@ -15,7 +15,7 @@ is packaged from the same build as the retained `aar` alias, avoiding SwiftPM
 case-insensitive product-name collisions with the Cueport receiver.
 
 No new model task or READY test is part of this rename. Historical results below
-qualify their actual alpha.3 artifacts, not new alpha.4 native acceptance. The existing 198 Swift +11 CLI +5 migration +3 archive +2 website checks pass,
+qualify their actual alpha.3 artifacts, not new alpha.4 native acceptance. The existing 198 Swift +11 CLI +5 migration +5 archive +2 website checks pass,
 including the public source CI. The actual current CLI (unchanged helper UUID)
 passed all11 packaged behavior checks. Signed app install/update, legacy rename,
 injected rename failure restoration and app-only rollback passed. Native startup
@@ -106,3 +106,24 @@ Focus or power policy was bypassed.
 The private READY driver is excluded from public source and packages. The
 product cannot send terminal input, answer questions or approve requests.
 See [alpha.2 evidence](quality-alpha2.md) for historical, separately scoped checks.
+
+
+## Configured-Hook dependency regression fixed before alpha.4 publication
+
+An inactive development bundle was recoverably archived while the default Codex
+Hooks still referenced its helper. Subsequent lifecycle hooks failed with shell
+exit127. The exact original signed bundle was restored to its referenced path;
+all seven configured own helpers resolve again. Hook command strings, trust and
+foreign handlers were not rewritten. The independent Cueport daily app/data were
+not rolled back. Keep this configured dependency until a separately reviewed
+Hook migration; inactivity alone is not proof that a bundle is unused.
+
+The cleanup planner and apply path now inspect default global Hook dependency
+metadata and retain referenced bundles even without a live process. First-name-
+change installation refuses referenced legacy applications and rechecks before
+replacement. Unsafe/unreadable configuration stops the operation. Hook commands
+are neither executed by this inspection nor logged. Added regression checks cover
+unmapped references, newly introduced references, unsafe/symlinked metadata and
+preservation of foreign fields. Actual signed rename/failure recovery tests also
+cover Hook references appearing during staging. This does not inspect arbitrary
+custom Hook sources: keep those dependencies until explicitly reviewed.

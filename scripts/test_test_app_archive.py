@@ -5,10 +5,13 @@ import tempfile
 import unittest
 from unittest.mock import patch
 import manage_test_apps as archive
+import manage_install as installer
 
 
 class ArchiveTests(unittest.TestCase):
     def setUp(self):
+        hooks = patch.object(archive, "configured_hook_commands", return_value=[])
+        hooks.start(); self.addCleanup(hooks.stop)
         self.temporary = tempfile.TemporaryDirectory(prefix="aar-archive-")
         self.addCleanup(self.temporary.cleanup)
         self.root = Path(self.temporary.name).resolve() / "build"
@@ -54,6 +57,31 @@ class ArchiveTests(unittest.TestCase):
         plan["entries"][0]["destination"] = str(self.root.parent / "outside.app")
         with self.assertRaises(ValueError): archive.apply(plan, self.receipt)
         self.assertTrue(self.app.exists())
+
+    def testConfiguredHooksProtectUnmappedBundleAndAreRecheckedBeforeApply(self):
+        command = "'" + str(self.app / "Contents/MacOS/aar") + "' hook"
+        result = archive.plan(self.root, [], [command])
+        self.assertEqual(result["entries"][0]["status"], "configured-hook-retained")
+        reviewed = archive.plan(self.root, [], [])
+        with patch.object(archive, "active_paths", return_value=[]), patch.object(archive, "configured_hook_commands", return_value=[command]):
+            result = archive.apply(reviewed, self.receipt)
+        self.assertEqual(result["entries"][0]["status"], "became-configured-retained")
+        self.assertTrue(self.app.exists())
+
+    def testHookDependencyInspectionPreservesForeignFieldsAndRefusesUnsafeFiles(self):
+        hooks = self.root / "hooks.json"
+        command = "'/synthetic/Other App.app/Contents/MacOS/helper' hook"
+        original = json.dumps({"keep": {"enabled": True}, "hooks": {"Stop": [{"hooks": [{"type": "command", "command": command}]}]}}).encode()
+        hooks.write_bytes(original); hooks.chmod(0o600)
+        self.assertEqual(installer.configured_hook_commands(hooks), [command])
+        self.assertEqual(hooks.read_bytes(), original)
+        link = self.root / "linked-hooks.json"; link.symlink_to(hooks)
+        with self.assertRaises(OSError): installer.configured_hook_commands(link)
+        hooks.chmod(0o644)
+        with self.assertRaises(ValueError): installer.configured_hook_commands(hooks)
+        hooks.chmod(0o600); hooks.write_text('{"hooks": []}')
+        with self.assertRaises(ValueError): installer.configured_hook_commands(hooks)
+
 
 
 if __name__ == "__main__":

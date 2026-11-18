@@ -12,12 +12,69 @@ import os
 from pathlib import Path
 import plistlib
 import shutil
+import shlex
+import stat
 import subprocess
 import uuid
 
 NAME = "Cueport.app"
 LEGACY_NAME = "Agent Attention Router.app"
 BUNDLE_ID = "org.agentattentionrouter.local-development"
+
+
+def configured_hook_commands(hooks_file=None):
+    """Read dependency metadata only; never execute or log Hook commands."""
+    path = hooks_file or Path.home() / ".codex" / "hooks.json"
+    try:
+        fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+    except FileNotFoundError:
+        return []
+    try:
+        info = os.fstat(fd)
+        if not stat.S_ISREG(info.st_mode) or info.st_uid != os.getuid() or info.st_mode & 0o077 or info.st_size > 1_048_576:
+            raise ValueError("Hook dependency metadata could not be verified; retain the old application")
+        with os.fdopen(fd, "rb", closefd=False) as stream:
+            raw = stream.read(1_048_577)
+        if len(raw) != info.st_size:
+            raise ValueError("Hook dependency metadata changed during inspection")
+        document = json.loads(raw)
+        hooks = document.get("hooks", {})
+        if not isinstance(hooks, dict):
+            raise ValueError("Invalid Hook dependency metadata")
+        commands = []
+        for groups in hooks.values():
+            if not isinstance(groups, list):
+                raise ValueError("Invalid Hook dependency metadata")
+            for group in groups:
+                handlers = group.get("hooks") if isinstance(group, dict) else None
+                if not isinstance(handlers, list):
+                    raise ValueError("Invalid Hook dependency metadata")
+                for handler in handlers:
+                    if not isinstance(handler, dict):
+                        raise ValueError("Invalid Hook dependency metadata")
+                    if handler.get("type") == "command":
+                        command = handler.get("command")
+                        if not isinstance(command, str):
+                            raise ValueError("Invalid Hook dependency metadata")
+                        commands.append(command)
+        return commands
+    except (json.JSONDecodeError, AttributeError) as error:
+        raise ValueError("Hook dependency metadata could not be verified; retain the old application") from error
+    finally:
+        os.close(fd)
+
+
+def hooks_reference_application(app, commands):
+    prefix = str(app) + "/"
+    for command in commands:
+        if prefix in command:
+            return True
+        try:
+            if any(token.startswith(prefix) for token in shlex.split(command)):
+                return True
+        except ValueError as error:
+            raise ValueError("Hook command dependency could not be parsed; retain the old application") from error
+    return False
 
 
 def check_ancestors(path):
@@ -100,6 +157,8 @@ def install(source, destination, expected, rename_from=None):
         if receiver_running(destination):
             raise ValueError("Quit only the receiver at the destination before updating. Codex clients may stay open.")
         old = rename_from or destination
+        if rename_from is not None and hooks_reference_application(old, configured_hook_commands()):
+            raise ValueError("Configured Codex Hooks still reference the old application. Retain it until those Hooks are reviewed and safely moved; Hook trust is never changed here.")
         if rename_from is not None and legacy_in_use(old):
             raise ValueError("Exit legacy Codex connections and quit the old receiver before renaming")
         previous = fingerprint(old) if old.exists() else None
@@ -122,6 +181,8 @@ def install(source, destination, expected, rename_from=None):
             raise ValueError("Destination receiver started during staging; installation cancelled")
         if rename_from is not None and (destination.exists() or legacy_in_use(old)):
             raise ValueError("Legacy application became active or Cueport appeared during staging")
+        if rename_from is not None and hooks_reference_application(old, configured_hook_commands()):
+            raise ValueError("Configured Codex Hooks began referencing the old application during staging; rename cancelled")
         if (fingerprint(old) if old.exists() else None) != previous:
             raise ValueError("Destination changed during staging")
         moved = False

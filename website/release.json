@@ -1,13 +1,13 @@
 {
-  "version": "0.1.0-alpha.3",
-  "release_url": "https://github.com/liyunhui0707/cueport/releases/tag/v0.1.0-alpha.3",
-  "download_url": "https://github.com/liyunhui0707/cueport/releases/download/v0.1.0-alpha.3/AgentAttentionRouter-0.1.0-alpha.3-macos-arm64.zip",
-  "sha256": "3c5291546b7fab61846677ed9ed55ed2e847de9467082efaa4fb34b57505e45d",
+  "version": "0.1.0-alpha.4",
+  "release_url": "https://github.com/liyunhui0707/cueport/releases/tag/v0.1.0-alpha.4",
+  "download_url": "https://github.com/liyunhui0707/cueport/releases/download/v0.1.0-alpha.4/Cueport-0.1.0-alpha.4-macos-arm64.zip",
+  "sha256": "687f0c6082cb5e46aeac3fe9f5d57fa07b6a4dd8547e5a7cc10be8ef5100ea50",
   "supported_codex": [
     "0.169.0",
     "0.170.0"
   ],
-  "notice": "原生验收尚未完整完成，保留一次焦点核验安全拒绝，长测仍在进行。请按实验版本使用并阅读版本说明。",
-  "entry_description": "独立 macOS 应用与菜单栏入口。可在 Settings 中开启 Show application in Dock，显示独立 Dock 图标。",
+  "notice": "Cueport 实验性预发布：需要显式连接 Codex；原生通知、Spaces 和完整无障碍验收仍有缺口，长测结果单独记录。请阅读版本说明。",
+  "entry_description": "Cueport 是独立 macOS 应用，提供菜单栏入口。可在 Settings 中开启 Show application in Dock，显示 Dock 图标。",
   "recovery_description": "应用会为同一原始终端尝试有界连接恢复。未恢复时先保存草稿，再用设置里的恢复命令接入；不会重发任务或批准请求。"
 }

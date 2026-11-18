@@ -13,8 +13,8 @@ final class BoundedProcessTests: XCTestCase {
     }
 
     func testOutputLimitStopsAnUnendingProducer() throws {
-        XCTAssertThrowsError(try BoundedProcess.output(URL(fileURLWithPath: "/usr/bin/python3"),
-            arguments: ["-c", "import os\nwhile True: os.write(1, b'x' * 16384)"],
+        XCTAssertThrowsError(try BoundedProcess.output(URL(fileURLWithPath: "/usr/bin/yes"),
+            arguments: ["x"],
             timeout: 3, maximumBytes: 32768)) {
             XCTAssertEqual($0 as? BoundedProcess.Failure, .outputLimit)
         }
@@ -25,10 +25,12 @@ final class BoundedProcessTests: XCTestCase {
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: directory) }
         let marker = directory.appendingPathComponent("owned-pid")
-        let script = "import os,signal,time,sys\nsignal.signal(signal.SIGTERM, signal.SIG_IGN)\nopen(sys.argv[1], 'w').write(str(os.getpid()))\nos.close(1)\nwhile True: time.sleep(.1)"
+        // Keep the fixture in one native process: an interpreter's cold startup
+        // must not consume the deadline before the signal handler/PID marker exist.
+        let script = "trap '' TERM; printf '%s' \"$$\" > \"$1\"; exec 1>&-; while :; do :; done"
         let start = DispatchTime.now().uptimeNanoseconds
-        XCTAssertThrowsError(try BoundedProcess.output(URL(fileURLWithPath: "/usr/bin/python3"),
-            arguments: ["-c", script, marker.path], timeout: 1)) {
+        XCTAssertThrowsError(try BoundedProcess.output(URL(fileURLWithPath: "/bin/sh"),
+            arguments: ["-c", script, "aar-timeout-fixture", marker.path], timeout: 1)) {
             XCTAssertEqual($0 as? BoundedProcess.Failure, .timeout)
         }
         XCTAssertLessThan(Double(DispatchTime.now().uptimeNanoseconds - start) / 1e9, 4)

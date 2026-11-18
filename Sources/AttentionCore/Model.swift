@@ -199,7 +199,7 @@ public enum RouterError: Error, LocalizedError {
         case .sessionNotFound: "The original terminal session could not be found. It may have closed. No other session was selected."
         case .ambiguousSession: "More than one terminal matched. No session was selected."
         case .commandFailed: "The terminal could not be focused. Check Diagnostics and iTerm2’s API permissions."
-        case .consumerAlreadyRunning: "Another Attention Router instance is already monitoring this data directory."
+        case .consumerAlreadyRunning: "Another Cueport instance is already monitoring this data directory."
         case .profileMigrating: "This bridge profile is being migrated. Wait for migration to finish, then copy a new launch/resume command from the installed app."
         case .relocatedStorage: "This bridge profile was relocated. Open the installed application and use its current Copy launch/resume command; the retained old profile will not be reopened."
         case .unverifiedOrigin: "The original foreground Codex process could not be verified. No other terminal was selected."

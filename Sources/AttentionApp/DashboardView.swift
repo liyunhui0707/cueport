@@ -13,9 +13,9 @@ struct DashboardView: View {
         VStack(spacing: 0) {
             VStack(alignment: .leading, spacing: 20) {
                 HStack(spacing: 10) {
-                    RouterMark()
+                    CueportMark()
                     VStack(alignment: .leading, spacing: 3) {
-                        Text("Attention Router").font(.system(size: 14, weight: .semibold))
+                        Text("Cueport").font(.system(size: 14, weight: .semibold))
                         Text("Never miss an agent that needs you.").font(.system(size: 10)).foregroundStyle(.secondary)
                     }
                     Spacer(minLength: 8)
@@ -86,7 +86,7 @@ struct DashboardView: View {
                 Spacer()
                 IconButton(icon: "waveform.path.ecg", label: "Diagnostics", action: openDiagnostics)
                 IconButton(icon: "gearshape", label: "Settings", action: openSettings)
-                Menu { Button("Quit Attention Router") { NSApp.terminate(nil) } } label: { Image(systemName: "ellipsis").frame(width: 20) }.menuStyle(.borderlessButton).frame(width: 24).help("More")
+                Menu { Button("Quit Cueport") { NSApp.terminate(nil) } } label: { Image(systemName: "ellipsis").frame(width: 20) }.menuStyle(.borderlessButton).frame(width: 24).help("More")
             }.padding(.horizontal, 18).padding(.vertical, 9)
         }.frame(width: 400).background(Design.background)
     }

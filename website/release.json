@@ -1,7 +1,7 @@
 {
   "version": "0.1.0-alpha.3",
-  "release_url": "https://github.com/liyunhui0707/agent-attention-router/releases/tag/v0.1.0-alpha.3",
-  "download_url": "https://github.com/liyunhui0707/agent-attention-router/releases/download/v0.1.0-alpha.3/AgentAttentionRouter-0.1.0-alpha.3-macos-arm64.zip",
+  "release_url": "https://github.com/liyunhui0707/cueport/releases/tag/v0.1.0-alpha.3",
+  "download_url": "https://github.com/liyunhui0707/cueport/releases/download/v0.1.0-alpha.3/AgentAttentionRouter-0.1.0-alpha.3-macos-arm64.zip",
   "sha256": "3c5291546b7fab61846677ed9ed55ed2e847de9467082efaa4fb34b57505e45d",
   "supported_codex": [
     "0.169.0",

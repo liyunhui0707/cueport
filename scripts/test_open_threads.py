@@ -47,14 +47,14 @@ int main(void) {
     fixture = directory / "codex"
     subprocess.run(["/usr/bin/clang", str(source), "-o", str(fixture)], check=True, capture_output=True)
     clone = directory / "LiveListCheck.app"
-    shutil.copytree(pathlib.Path(os.environ.get("AAR_REVIEW_APP", str(ROOT / "build/Agent Attention Router.app"))), clone)
+    shutil.copytree(pathlib.Path(os.environ.get("AAR_REVIEW_APP", str(ROOT / "build/artifacts.noindex/Cueport.app"))), clone)
     plist = clone / "Contents/Info.plist"
     info = plistlib.loads(plist.read_bytes())
     info["CFBundleIdentifier"] = "org.agentattentionrouter.open-thread-check." + uuid.uuid4().hex
     info["AARBuildChannel"] = "review"
     plist.write_bytes(plistlib.dumps(info))
     subprocess.run(["/usr/bin/codesign", "--force", "--sign", "-", str(clone)], check=True, capture_output=True)
-    executable = clone / "Contents/MacOS/AgentAttentionRouter"
+    executable = clone / "Contents/MacOS/CueportApp"
     helper = executable.with_name("aar")
     data = directory / "data"
     child = None; fixture_pid = None; master = None

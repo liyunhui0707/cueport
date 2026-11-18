@@ -31,7 +31,7 @@ def main():
         ("startup_duplicate_and_profile", [sys.executable, str(scripts / "test_startup_profile.py")], 90),
         ("closed_process_filter", [sys.executable, str(scripts / "test_open_threads.py")], 90),
         ("native_dependency_protocol", [sys.executable, str(scripts / "test_native_dependency.py"), "--codex", str(options.codex.absolute()), "--helper", str(app / "Contents/MacOS/aar")], 90),
-        ("native_sample_views", [str(app / "Contents/MacOS/AgentAttentionRouter"), "--render-previews", str(output / "sample-views")], 90),
+        ("native_sample_views", [str(app / "Contents/MacOS/CueportApp"), "--render-previews", str(output / "sample-views")], 90),
     ]
     results = {}
     for name, command, timeout in checks:
@@ -58,7 +58,7 @@ def main():
             # Preserve the failed batch; a focused follow-up can be recorded
             # separately after diagnosis, without repeating unrelated GUI work.
             break
-    report = {"checks": results, "app_executable_sha256": hashlib.sha256((app / "Contents/MacOS/AgentAttentionRouter").read_bytes()).hexdigest(),
+    report = {"checks": results, "app_executable_sha256": hashlib.sha256((app / "Contents/MacOS/CueportApp").read_bytes()).hexdigest(),
               "helper_sha256": hashlib.sha256((app / "Contents/MacOS/aar").read_bytes()).hexdigest(),
               "real_codex_tui_origin_and_spaces": "NOT_RUN", "visible_system_banners": "NOT_RUN",
               "real_sessions_or_credentials": "not used", "model_turns": 0, "permission_changes": "none",

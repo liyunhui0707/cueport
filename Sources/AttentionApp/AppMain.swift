@@ -10,7 +10,7 @@ struct AppMain {
         app.setActivationPolicy(.accessory)
         autoreleasepool {
             let menu = NSMenu(), applicationItem = NSMenuItem(), applicationMenu = NSMenu()
-            let quit = NSMenuItem(title: "Quit Attention Router", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
+            let quit = NSMenuItem(title: "Quit Cueport", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
             quit.target = app; quit.keyEquivalentModifierMask = .command
             applicationMenu.addItem(quit); applicationItem.submenu = applicationMenu
             menu.addItem(applicationItem); app.mainMenu = menu
@@ -21,7 +21,7 @@ struct AppMain {
         let review = Bundle.main.object(forInfoDictionaryKey: "AARBuildChannel") as? String == "review"
         if review && !ReceiverLaunchPolicy.reviewRunIsIsolated(CommandLine.arguments) {
             let alert = NSAlert()
-            alert.messageText = "This is an Attention Router test build"
+            alert.messageText = "This is an Cueport test build"
             alert.informativeText = "Use the daily application for your projects. A test build requires an explicit, separate --data-dir and does not inherit your daily bridge. No receiver was started."
             alert.addButton(withTitle: "Quit test build")
             alert.runModal()
@@ -60,14 +60,14 @@ struct AppMain {
     private let validationLabel = Bundle.main.object(forInfoDictionaryKey: "AARValidationBuild") as? Bool == true
     func applicationDidFinishLaunching(_ notification: Notification) {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
-        // The packaged template preserves the system glyph without resolving
-        // its symbol/font machinery on every background receiver launch.
+        // Use the original Cueport template without loading symbol/font machinery
+        // on every background receiver launch.
         let indicator = NSImage(named: "AARStatusIndicator") ?? NSImage(systemSymbolName: "dot.radiowaves.left.and.right", accessibilityDescription: nil)
         indicator?.isTemplate = true
-        indicator?.accessibilityDescription = "Agent Attention Router"
+        indicator?.accessibilityDescription = "Cueport"
         statusItem.button?.image = indicator
         statusItem.button?.target = self; statusItem.button?.action = #selector(toggle)
-        statusItem.button?.toolTip = review || validationLabel ? "Attention Router — Test build (isolated data)" : "Attention Router — Daily application"
+        statusItem.button?.toolTip = review || validationLabel ? "Cueport — Test build (isolated data)" : "Cueport — Daily application"
         model.onCountChanged = { [weak self] count in
             guard let self else { return }
             let title = (self.review || self.validationLabel ? " TEST" : "") + (count == 0 ? "" : " \(count)")
@@ -108,7 +108,7 @@ struct AppMain {
     }
     func applicationDockMenu(_ sender: NSApplication) -> NSMenu? {
         let menu = NSMenu()
-        let show = NSMenuItem(title: "Open Attention Router", action: #selector(showFromDock), keyEquivalent: "")
+        let show = NSMenuItem(title: "Open Cueport", action: #selector(showFromDock), keyEquivalent: "")
         show.target = self; menu.addItem(show)
         let settings = NSMenuItem(title: "Settings…", action: #selector(settingsFromDock), keyEquivalent: "")
         settings.target = self; menu.addItem(settings)
@@ -171,7 +171,7 @@ struct AppMain {
     }
     func openWindow(settings: Bool) {
         popover.performClose(nil)
-        let title = (settings ? "Settings — Attention Router" : "Diagnostics — Attention Router") + (review ? " — TEST" : "")
+        let title = (settings ? "Settings — Cueport" : "Diagnostics — Cueport") + (review ? " — TEST" : "")
         if let existing = windows.first(where: { $0.title == title }) {
             existing.makeKeyAndOrderFront(nil); NSApp.activate(ignoringOtherApps: true)
             return
@@ -221,7 +221,7 @@ struct AppMain {
         guard !model.demo, model.notificationsEnabled, !model.paused,
               !CommandLine.arguments.contains("--no-notifications") else { return }
         let content = UNMutableNotificationContent()
-        content.title = "Attention Router · Notification test"
+        content.title = "Cueport · Notification test"
         content.body = "System delivery test. Click to confirm receipt."
         content.userInfo = ["deliveryTest": true]
         if model.soundEnabled { content.sound = .default }
@@ -240,7 +240,7 @@ struct AppMain {
         guard model.hasRoutingPOC, let test = model.originPOC?.payload,
               !CommandLine.arguments.contains("--no-notifications") else { return }
         let content = UNMutableNotificationContent()
-        content.title = "Attention Router · Local routing test"
+        content.title = "Cueport · Local routing test"
         content.body = "Click to return to the verified Codex comparison pane."
         content.userInfo = ["sessionID": test.sessionID, "sourceInstance": test.origin.process.instanceID]
         if model.soundEnabled { content.sound = .default }

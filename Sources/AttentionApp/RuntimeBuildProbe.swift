@@ -9,7 +9,7 @@ enum RuntimeBuildProbe {
         readUUID(Bundle.main.executableURL)
     }
     static func helperDiskUUID() -> String? {
-        readUUID(Bundle.main.executableURL?.deletingLastPathComponent().appendingPathComponent("aar"))
+        readUUID(Bundle.main.executableURL?.deletingLastPathComponent().appendingPathComponent("cueport"))
     }
     private static func readUUID(_ file: URL?) -> String? {
         guard let file else { return nil }

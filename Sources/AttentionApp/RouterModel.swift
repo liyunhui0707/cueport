@@ -249,7 +249,7 @@ import Darwin
     func prepareDefaultBridgeStartup() {
         guard !demo, !bridgePOC, !hasSavedStartup else { return }
         let directory = LocalStore.defaultRoot.deletingLastPathComponent()
-            .appendingPathComponent("AgentAttentionRouter-Bridge", isDirectory: true)
+            .appendingPathComponent("Cueport-Bridge", isDirectory: true)
         do {
             try LocalStore.requireSeparate(directory)
             _ = try LocalStore(root: directory)
@@ -262,7 +262,7 @@ import Darwin
         guard !demo else { return }
         let panel = NSOpenPanel()
         panel.title = "Bridge startup folder"
-        panel.message = "Choose an existing private Attention Router data folder. This changes the next app launch; current sessions stay on their existing connection."
+        panel.message = "Choose an existing private Cueport data folder. This changes the next app launch; current sessions stay on their existing connection."
         panel.prompt = "Use on next launch"
         panel.canChooseDirectories = true; panel.canChooseFiles = false
         panel.allowsMultipleSelection = false; panel.canCreateDirectories = false

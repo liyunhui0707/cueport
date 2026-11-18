@@ -57,6 +57,36 @@ def main():
             except ValueError as error:
                 assert "Injected" in str(error)
         assert installer.fingerprint(target) == before
+        # The product rename retains the old application and rejects active
+        # legacy helpers. A failed replacement restores the old pathname.
+        legacy = root / "Rename Applications" / installer.LEGACY_NAME
+        legacy.parent.mkdir()
+        shutil.copytree(options.app, legacy)
+        renamed = legacy.with_name(installer.NAME)
+        with patch.object(installer, "legacy_in_use", return_value=True):
+            try:
+                installer.install(options.app, renamed, digest, legacy)
+                raise AssertionError("Active legacy bundle accepted")
+            except ValueError as error:
+                assert "legacy Codex" in str(error)
+        assert legacy.exists() and not renamed.exists()
+        real_validate = installer.validate
+        def fail_renamed(app):
+            if app == renamed:
+                raise ValueError("Injected rename verification failure")
+            real_validate(app)
+        with patch.object(installer, "validate", fail_renamed):
+            try:
+                installer.install(options.app, renamed, digest, legacy)
+                raise AssertionError("Rename failure injection did not fire")
+            except ValueError as error:
+                assert "Injected rename" in str(error)
+        assert legacy.exists() and not renamed.exists()
+        renamed_receipt = installer.install(options.app, renamed, digest, legacy)
+        assert renamed_receipt["renamed_from"] == str(legacy)
+        assert not legacy.exists() and installer.fingerprint(renamed) == digest
+        assert installer.fingerprint(Path(renamed_receipt["backup_app"])) == digest
+        assert sentinel.read_bytes() == original
         assert (target / "Contents/MacOS/aar").stat().st_ino == current_inode
         assert sentinel.read_bytes() == original
         with patch.object(installer, "receiver_running", return_value=True):

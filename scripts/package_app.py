@@ -23,7 +23,7 @@ if version is not None and re.fullmatch(r"(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[
 build_number = (root / "BUILD_NUMBER").read_text().strip() if version is not None else None
 if build_number is not None and re.fullmatch(r"[1-9][0-9]*(?:\.[0-9]+){0,2}", build_number) is None:
     raise SystemExit("BUILD_NUMBER must be an explicit positive numeric bundle build")
-app = (options.output or root / "build" / "artifacts.noindex" / "Agent Attention Router.app").absolute()
+app = (options.output or root / "build" / "artifacts.noindex" / "Cueport.app").absolute()
 bundle_id = "org.agentattentionrouter.review" if options.channel == "review" else "org.agentattentionrouter.local-development"
 if options.channel == "review" and options.output is None:
     raise SystemExit("Review builds require an explicit --output; the daily bundle is preserved")
@@ -45,23 +45,26 @@ with tempfile.TemporaryDirectory(prefix="status-assets-", dir=root / "build") as
                     str(pathlib.Path(temporary) / "asset-info.plist")], check=True, capture_output=True)
     if not (resources / "Assets.car").is_file():
         raise SystemExit("Status template asset catalog was not produced")
-for name in ["AgentAttentionRouter", "aar"]:
+for name in ["CueportApp", "cueport", "aar"]:
     # A bridge worker may still have the previous executable mapped. Never
     # overwrite that inode: macOS can kill it when signed code pages change.
     staging = macos / ("." + name + "-" + uuid.uuid4().hex)
-    shutil.copy2(root / "build" / "swift" / mode / name, staging)
+    # Keep receiver and helper names distinct on case-insensitive filesystems.
+    # The cueport CLI is an alias of the aar build for existing integrations.
+    product = "aar" if name == "cueport" else name
+    shutil.copy2(root / "build" / "swift" / mode / product, staging)
     if mode == "release":
         # Omit debug-map/source paths and local linker symbols from distribution.
         # Keep global symbols and runtime metadata; retain local dSYMs separately.
         subprocess.run(["/usr/bin/strip", "-S", "-x", str(staging)], check=True, capture_output=True)
-    if name == "aar":
+    if name in {"cueport", "aar"}:
         subprocess.run(["/usr/bin/codesign", "--force", "--sign", "-", "--identifier", bundle_id + ".helper", str(staging)], check=True, capture_output=True)
     staging.replace(macos / name)
 info = {
-    "CFBundleExecutable": "AgentAttentionRouter",
+    "CFBundleExecutable": "CueportApp",
     "CFBundleIdentifier": bundle_id,
-    "CFBundleName": "Agent Attention Router",
-    "CFBundleDisplayName": "Attention Router TEST" if options.channel == "review" else "Agent Attention Router",
+    "CFBundleName": "Cueport",
+    "CFBundleDisplayName": "Cueport TEST" if options.channel == "review" else "Cueport",
     "CFBundlePackageType": "APPL",
     "LSApplicationCategoryType": "public.app-category.developer-tools",
     "CFBundleIconFile": "AppIcon",
@@ -71,7 +74,7 @@ info = {
     "LSUIElement": True,
     "NSHighResolutionCapable": True,
     "NSPrincipalClass": "NSApplication",
-    "NSHumanReadableCopyright": "Agent Attention Router contributors",
+    "NSHumanReadableCopyright": "Cueport contributors",
     "AARBuildChannel": options.channel,
 }
 if version is not None:
@@ -81,6 +84,8 @@ if version is not None:
                 CFBundleVersion=build_number,
                 AARReleaseVersion=version)
 (app / "Contents" / "Info.plist").write_bytes(plistlib.dumps(info))
+if (macos / "CueportApp").samefile(macos / "cueport"):
+    raise SystemExit("Receiver and CLI must be distinct files")
 subprocess.run(["/usr/bin/codesign", "--force", "--sign", "-", "--identifier", info["CFBundleIdentifier"], str(app)], check=True)
 asset_check = root / "build/check-status-asset"
 subprocess.run(["swiftc", "-parse-as-library", str(root / "scripts/check_status_asset.swift"),

@@ -9,7 +9,7 @@ struct UtilityView: View {
         ScrollView {
         VStack(alignment: .leading, spacing: 22) {
             HStack(spacing: 12) {
-                RouterMark(size: 42)
+                CueportMark(size: 42)
                 VStack(alignment: .leading, spacing: 5) {
                     Text(settings ? "Make room for focus." : "A clear view of your connection.").font(.system(size: 23, weight: .semibold, design: .rounded)).tracking(-0.5)
                     Text(settings ? "A few thoughtful defaults. Always on your Mac." : "Local checks. No prompts, commands or credentials.").font(.system(size: 12)).foregroundStyle(.secondary)
@@ -93,7 +93,7 @@ struct UtilityView: View {
         }
     }
     private func copyCommand(resume: Bool) {
-        let executable = Bundle.main.bundleURL.appendingPathComponent("Contents/MacOS/aar").path
+        let executable = Bundle.main.bundleURL.appendingPathComponent("Contents/MacOS/cueport").path
         let command: String
         if model.bridgePOC {
             guard let launch = try? BridgeLaunchOptions(codexArguments: resume ? ["resume"] : []) else { return }
@@ -116,8 +116,8 @@ struct UtilityView: View {
                 .font(.system(size: 11)).foregroundStyle(.secondary)
             Toggle("Show application in Dock", isOn: $model.showInDock)
                 .toggleStyle(.switch).font(.system(size: 12))
-                .help("Keep an independent application icon in the Dock. Click it to open Attention Router; the menu bar entry stays available.")
-            Text("Application · " + (model.demo ? "/Applications/Agent Attention Router.app" : Bundle.main.bundleURL.path))
+                .help("Keep an independent application icon in the Dock. Click it to open Cueport; the menu bar entry stays available.")
+            Text("Application · " + (model.demo ? "/Applications/Cueport.app" : Bundle.main.bundleURL.path))
                 .font(.system(size: 10)).foregroundStyle(.secondary).textSelection(.enabled)
                 .fixedSize(horizontal: false, vertical: true)
             Text("Current mode · " + model.currentModeDescription).font(.system(size: 12, weight: .medium))

@@ -6,15 +6,15 @@ backend services are not bundled. Review [compatibility](compatibility.md).
 
 ## Download and first open
 
-Download the exact selected release app archive and `SHA256SUMS` from the [Releases](https://github.com/liyunhui0707/agent-attention-router/releases). Verify the archive against that release's digest:
+Download the exact selected release app archive and `SHA256SUMS` from the [Releases](https://github.com/liyunhui0707/cueport/releases). Verify the archive against that release's digest:
 
 ```sh
-shasum -a 256 AgentAttentionRouter-0.1.0-alpha.3-macos-arm64.zip
+shasum -a 256 Cueport-0.1.0-alpha.4-macos-arm64.zip
 ```
 
 Compare its complete result with the published checksum. A checksum establishes
 byte integrity, not publisher identity or product correctness. Extract the app
-and keep it at `~/Applications/Agent Attention Router.app`.
+and keep it at `~/Applications/Cueport.app`.
 
 macOS may block an app without Developer ID/notarization. If you have reviewed
 and trust this source, use the normal macOS Privacy & Security first-open flow
@@ -43,7 +43,7 @@ Python 3 is needed only for the optional reviewed installer below.
 Check the file/version and iTerm utility without starting a conversation:
 
 ```sh
-'./Agent Attention Router.app/Contents/MacOS/aar' check-bridge-dependencies
+'./Cueport.app/Contents/MacOS/cueport' check-bridge-dependencies
 ```
 
 For an explicitly selected native file, add `--native-codex /absolute/path/codex`
@@ -62,7 +62,7 @@ or updater. Complete normal Codex setup before retrying a connected launch.
 
 1. Open the installed app, then Settings → Your connection → Opening the app.
 2. On a clean installation, select **Set up connected bridge…**. It prepares
-   `~/Library/Application Support/AgentAttentionRouter-Bridge` privately and saves
+   `~/Library/Application Support/Cueport-Bridge` privately and saves
    the next startup choice. Quit and reopen the app; confirm Connected bridge.
 3. Use **Copy launch command** for a new conversation. Use **Copy resume command**
    for an existing project, then select its original conversation in the native
@@ -83,7 +83,7 @@ retained without inventing request resolution. Archive/restore is in Diagnostics
 Keep `manage_install.py` beside the extracted app. Start with a review:
 
 ```sh
-python3 manage_install.py --app './Agent Attention Router.app'
+python3 manage_install.py --app './Cueport.app'
 ```
 
 Review the destination and complete candidate fingerprint. Quit only the receiver
@@ -103,7 +103,7 @@ first finish and exit all its connected Codex clients, quit its receiver, then
 review a stopped-profile migration:
 
 ```sh
-python3 manage_bridge_data.py --source /absolute/old-profile --destination /absolute/new-profile --helper './Agent Attention Router.app/Contents/MacOS/aar'
+python3 manage_bridge_data.py --source /absolute/old-profile --destination /absolute/new-profile --helper './Cueport.app/Contents/MacOS/cueport'
 ```
 
 Only apply after the native preflight reports zero clients/workers/unknown
@@ -159,3 +159,28 @@ an alternative when all mapped clients are closed and an old-app backup is kept.
 | Cannot return | Keep the original pane/process open and review iTerm API permission. No title/project fallback is used. |
 | Question persists | Reviewed does not mean answered; unknown resolution is retained deliberately. |
 | Extra empty TEST icon | Close the explicit test receiver; keep the daily app. Test data and identity are separate. |
+
+
+## Upgrade from Agent Attention Router
+
+Cueport keeps the existing application identity, preferences and stored sessions.
+For the first name change, save drafts and finish tasks, manually exit the old
+connected clients, then quit the old receiver. Keep ordinary unrelated Codex
+sessions open. Preview the reviewed installer with the old sibling app specified:
+
+```sh
+python3 manage_install.py --app './Cueport.app' --rename-from "$HOME/Applications/Agent Attention Router.app"
+```
+
+Apply only after reviewing its candidate fingerprint, by adding `--apply
+--expected-fingerprint` and that exact value to the same command. Active old
+helpers or an existing conflicting Cueport destination stop the rename. The old
+app is retained in `~/Applications/.Cueport Backups`; current session data and
+preferences are never rolled back. `aar` remains a packaged compatibility alias;
+new copied commands use `Cueport.app/Contents/MacOS/cueport`.
+
+Existing remembered bridge folders are kept. A new setup uses
+`~/Library/Application Support/Cueport-Bridge`. Moving a development-folder
+profile is a separate stopped-profile operation with a reviewed fingerprint;
+never copy a stale backup over current data. Old release assets retain their
+original names and checksums.

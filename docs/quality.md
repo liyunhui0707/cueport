@@ -1,11 +1,25 @@
-# Alpha.3 experimental release evidence
+# Cueport alpha.4 evidence and historical alpha.3 scope
 
 This is an explicit connected-workflow prerelease for native arm64 Codex
 0.169.0 / 0.170.0, with an ad-hoc signature. It is not complete P0 acceptance.
 The owner explicitly chose to publish with incomplete native acceptance rather
 than continue repetitive READY tasks. Incomplete checks below remain incomplete.
 
-## Automated and package evidence
+## Cueport alpha.4 scope
+
+Alpha.4/build4 is the owner-selected brand and delivery update. Its native C-port
+and cue-dot artwork is original. The menu-bar template, app icon, in-app mark,
+public filenames and repository are aligned. Historical protocol/bundle IDs and
+versioned preference keys intentionally retain compatibility. The `cueport` CLI
+is packaged from the same build as the retained `aar` alias, avoiding SwiftPM
+case-insensitive product-name collisions with the Cueport receiver.
+
+No new model task or READY test is part of this rename. Historical results below
+qualify their actual alpha.3 artifacts, not new alpha.4 native acceptance. New
+regression, exact package, installer rename/rollback, visual render and resource
+results are recorded after execution; incomplete evidence is not passed by waiver.
+
+## Historical alpha.3 automated and package evidence
 
 - 198 Swift, 11 executable, 5 stopped-data migration, 3 recoverable app-archive
   and 2 website checks passed on the development host.

@@ -17,15 +17,25 @@ enum Design {
     }
 }
 
-struct RouterMark: View {
+struct CueportMark: View {
     var size: CGFloat = 32
     var body: some View {
         ZStack {
-            RoundedRectangle(cornerRadius: size * 0.29).fill(Design.amber.opacity(0.12))
-            Circle().stroke(Design.amber.opacity(0.30), lineWidth: 1.3).padding(size * 0.23)
-            Circle().fill(Design.amber).frame(width: size * 0.16, height: size * 0.16)
-            Circle().fill(Design.amber).frame(width: size * 0.13, height: size * 0.13).offset(x: size * 0.20, y: -size * 0.20)
+            RoundedRectangle(cornerRadius: size * 0.24).fill(Design.amber.opacity(0.10))
+            CueportPort().stroke(Design.green, style: StrokeStyle(lineWidth: size * 8.5 / 96, lineCap: .round))
+            Circle().fill(Design.amber).frame(width: size * 11 / 96, height: size * 11 / 96)
+                .offset(x: size * 28.5 / 96)
         }.frame(width: size, height: size).accessibilityHidden(true)
+    }
+}
+
+private struct CueportPort: Shape {
+    func path(in rect: CGRect) -> Path {
+        var path = Path()
+        path.addArc(center: CGPoint(x: rect.width * 46 / 96, y: rect.height / 2),
+                    radius: min(rect.width, rect.height) / 4,
+                    startAngle: .degrees(45), endAngle: .degrees(315), clockwise: false)
+        return path
     }
 }
 

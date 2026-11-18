@@ -1,4 +1,4 @@
-# Agent Attention Router
+# Cueport
 
 Never miss an agent that needs you.
 
@@ -10,7 +10,7 @@ return to the exact registered terminal without searching for it.
 or resume workflow below. Ordinary unwrapped Codex sessions are not automatically
 attached. This is not complete P0/ordinary-CLI support.
 
-[Product website](https://liyunhui0707.github.io/agent-attention-router/) · [中文](docs/README.zh-CN.md) · [Install and update](docs/install.md) ·
+[Product website](https://liyunhui0707.github.io/cueport/) · [中文](docs/README.zh-CN.md) · [Install and update](docs/install.md) ·
 [Compatibility and acceptance](docs/compatibility.md) · [Quality evidence](docs/quality.md) · [Security](SECURITY.md) · [Third-party notices](THIRD_PARTY_NOTICES.md)
 
 ![Native grouped panel with synthetic sample sessions](docs/images/open-threads-dark.png)
@@ -41,9 +41,11 @@ The app does not answer questions, grant approvals or send terminal input.
 Reviewed, answered, cancelled and unknown remain different states. Some Codex
 interaction lifecycles are unconfirmed; the app keeps that uncertainty visible.
 
-Current alpha.3 native acceptance is partial: five accurate notification returns,
-one safe verification refusal, Air notification and Dock visual checks incomplete.
-Long-duration observations are still running. [Exact evidence and limits](docs/quality.md).
+Cueport is the new name of Agent Attention Router. Alpha.4/build 4 unifies the
+app, CLI, icon, repository and website while retaining existing data and settings.
+Native notification acceptance is not repeated for this rename. Alpha.3 recorded
+five accurate returns and one safe refusal; Air/Dock and long-duration limits
+remain explicit. [Exact evidence and limits](docs/quality.md).
 
 ## Requirements
 
@@ -61,8 +63,8 @@ Python, Node and accounts are not bundled.
 
 ## Install and connect
 
-Download a published package from [Releases](https://github.com/liyunhui0707/agent-attention-router/releases), extract it and keep
-`Agent Attention Router.app` in `~/Applications`. See [installation](docs/install.md)
+Download a published package from [Releases](https://github.com/liyunhui0707/cueport/releases), extract it and keep
+`Cueport.app` in `~/Applications`. See [installation](docs/install.md)
 for verification, macOS first-open handling and update/rollback instructions.
 
 1. Open the app → Settings → Your connection → Opening the app.
@@ -103,7 +105,7 @@ zsh scripts/test.sh
 zsh scripts/build.sh release
 ```
 
-The app is built under `build/artifacts.noindex/Agent Attention Router.app`. Build/test commands
+The app is built under `build/artifacts.noindex/Cueport.app`. Build/test commands
 neither install Hooks nor change your Codex configuration. Native GUI, permission,
 notification and Spaces acceptance require a logged-in Mac and remain separate
 from automated tests. [Acceptance scope](docs/compatibility.md).
@@ -115,7 +117,7 @@ use the reviewed optional installer for app-only rollback. Never restore an old
 session-data snapshot as part of an app rollback.
 
 Use repository Issues for sanitized bugs. Report vulnerabilities privately through
-[Security Advisories](https://github.com/liyunhui0707/agent-attention-router/security/advisories/new); do not post transcripts,
+[Security Advisories](https://github.com/liyunhui0707/cueport/security/advisories/new); do not post transcripts,
 credentials or raw event payloads publicly.
 
 MIT License. See [LICENSE](LICENSE).

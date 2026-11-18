@@ -1,4 +1,4 @@
-"""Review/recoverably archive unused Attention Router build bundles.
+"""Review/recoverably archive unused Cueport/legacy Attention Router build bundles.
 
 Only project build outputs are eligible. No application is deleted, no data root
 is moved, and any executable/resource reference held by an AAR process protects
@@ -49,7 +49,7 @@ def active_paths():
     paths, pids = [], []
     for line in result.stdout.splitlines():
         parts = line.strip().split(None, 1)
-        if len(parts) == 2 and Path(parts[1]).name in {"aar", "AgentAttentionRouter"}:
+        if len(parts) == 2 and Path(parts[1]).name in {"aar", "cueport", "CueportApp", "AgentAttentionRouter"}:
             paths.append(parts[1]); pids.append(parts[0])
     if pids:
         result = subprocess.run(["/usr/sbin/lsof", "-n", "-P", "-a", "-p", ",".join(pids), "-F", "n"],

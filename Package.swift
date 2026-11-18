@@ -2,11 +2,11 @@
 import PackageDescription
 
 let package = Package(
-    name: "AgentAttentionRouter",
+    name: "Cueport",
     platforms: [.macOS(.v14)],
     products: [
         .executable(name: "aar", targets: ["AttentionCLI"]),
-        .executable(name: "AgentAttentionRouter", targets: ["AttentionApp"])
+        .executable(name: "CueportApp", targets: ["AttentionApp"])
     ],
     targets: [
         .target(name: "AttentionCore"),

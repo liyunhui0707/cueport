@@ -19,7 +19,7 @@ import uuid
 from manage_install import fingerprint
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
-APP = pathlib.Path(os.environ.get("AAR_REVIEW_APP", str(ROOT / "build/Agent Attention Router.app")))
+APP = pathlib.Path(os.environ.get("AAR_REVIEW_APP", str(ROOT / "build/artifacts.noindex/Cueport.app")))
 BASE = pathlib.Path(os.environ.get("AAR_RESOURCE_OUTPUT", str(ROOT / "build/poc/resources169")))
 DURATION, INTERVAL, WARMUP = 600, 5, 10
 
@@ -69,9 +69,10 @@ def live_cohort():
     legacy = ROOT / "build/Agent Attention Router.app"
     installed = pathlib.Path.home() / "Applications/Agent Attention Router.app"
     daily = installed if installed.exists() else legacy
-    receivers = {str(daily / "Contents/MacOS/AgentAttentionRouter"),
+    cueport = pathlib.Path.home() / "Applications/Cueport.app"
+    receivers = {str(cueport / "Contents/MacOS/CueportApp"), str(daily / "Contents/MacOS/AgentAttentionRouter"),
                  str(legacy / "Contents/MacOS/AgentAttentionRouter")}
-    helpers = {str(daily / "Contents/MacOS/aar"), str(legacy / "Contents/MacOS/aar")}
+    helpers = {str(cueport / "Contents/MacOS/cueport"), str(cueport / "Contents/MacOS/aar"), str(daily / "Contents/MacOS/aar"), str(legacy / "Contents/MacOS/aar")}
     result = run(["/bin/ps", "-ww", "-axo", "pid=,comm="], check=True)
     identities = {}
     for line in result.stdout.splitlines():
@@ -111,7 +112,7 @@ def main():
     directory.mkdir(mode=0o700)
     clone = directory / "ResourceMeasurement.app"
     source_fingerprint = fingerprint(APP)
-    source_executable_sha256 = hashlib.sha256((APP / "Contents/MacOS/AgentAttentionRouter").read_bytes()).hexdigest()
+    source_executable_sha256 = hashlib.sha256((APP / "Contents/MacOS/CueportApp").read_bytes()).hexdigest()
     shutil.copytree(APP, clone)
     assert fingerprint(clone) == source_fingerprint, "Source bundle changed during measurement staging"
     bundle_id = "org.agentattentionrouter.resource-measurement." + uuid.uuid4().hex
@@ -124,10 +125,10 @@ def main():
     channel = values.get("AARBuildChannel", "daily")
     assert channel in ("daily", "review"), "Unknown artifact channel"
     validation_label = values.get("AARValidationBuild", False)
-    values.update(CFBundleIdentifier=bundle_id, CFBundleDisplayName="Attention Router Resource Measurement")
+    values.update(CFBundleIdentifier=bundle_id, CFBundleDisplayName="Cueport Resource Measurement")
     info.write_bytes(plistlib.dumps(values))
     run(["/usr/bin/codesign", "--force", "--sign", "-", "--identifier", bundle_id, str(clone)], check=True)
-    executable = clone / "Contents/MacOS/AgentAttentionRouter"
+    executable = clone / "Contents/MacOS/CueportApp"
     data = directory / "data"
     identities = live_cohort()
     started_at = datetime.datetime.now(datetime.timezone.utc).isoformat()

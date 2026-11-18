@@ -365,7 +365,7 @@ enum BridgeFailure: LocalizedError {
     case usage, version, startup, nativeDependency
     var errorDescription: String? {
         switch self {
-        case .usage: "Usage: aar codex --data-dir /absolute/profile [--native-codex /absolute/path/codex] -- [--no-alt-screen] [resume [SESSION_UUID]]. Resume opens the native picker when no UUID is given. Other Codex arguments are not enabled."
+        case .usage: "Usage: cueport codex --data-dir /absolute/profile [--native-codex /absolute/path/codex] -- [--no-alt-screen] [resume [SESSION_UUID]]. Resume opens the native picker when no UUID is given. Other Codex arguments are not enabled."
         case .version: "Supported native Codex versions: \(BridgeCompatibility.supportedDescription). Recheck the selected installation; a running TUI and its proxy must use the same version."
         case .nativeDependency: "The native Codex version check failed or exceeded 30 seconds. Check the installed native executable or the explicit --native-codex path. No terminal focus was attempted."
         case .startup: "The private bridge could not establish its verified local connection. Ordinary Codex remains available."

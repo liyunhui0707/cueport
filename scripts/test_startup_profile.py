@@ -9,9 +9,9 @@ signal.signal(signal.SIGTERM, interrupted)
 R=pathlib.Path(__file__).resolve().parent.parent
 B=R/'build/poc/startup169'; B.mkdir(parents=True,exist_ok=True)
 W=B/('native-'+uuid.uuid4().hex); W.mkdir(mode=0o700)
-APP=W/'StartupCheck.app'; shutil.copytree(pathlib.Path(os.environ.get('AAR_REVIEW_APP',str(R/'build/Agent Attention Router.app'))),APP)
+APP=W/'StartupCheck.app'; shutil.copytree(pathlib.Path(os.environ.get('AAR_REVIEW_APP',str(R/'build/artifacts.noindex/Cueport.app'))),APP)
 ID='org.agentattentionrouter.startup-check.'+uuid.uuid4().hex
-P=APP/'Contents/Info.plist'; info=plistlib.loads(P.read_bytes());info['CFBundleIdentifier']=ID;info['CFBundleDisplayName']='Attention Router Startup Check';info['AARBuildChannel']='daily';info['AARValidationBuild']=True;P.write_bytes(plistlib.dumps(info))
+P=APP/'Contents/Info.plist'; info=plistlib.loads(P.read_bytes());info['CFBundleIdentifier']=ID;info['CFBundleDisplayName']='Cueport Startup Check';info['AARBuildChannel']='daily';info['AARValidationBuild']=True;P.write_bytes(plistlib.dumps(info))
 subprocess.run(['/usr/bin/codesign','--force','--sign','-','--identifier',ID,str(APP)],check=True,capture_output=True)
 D=W/'data';D.mkdir(mode=0o700); stat=D.stat()
 profile={'schema':1,'rootPath':str(D),'device':stat.st_dev,'inode':stat.st_ino}
@@ -20,7 +20,7 @@ subprocess.run(['/usr/bin/defaults','write',ID,key,'-data',encoded.hex()],check=
 native_key='nativeCodexExecutable.v1'
 native_encoded=json.dumps({'schema':1,'path':"/synthetic/native's/$(literal)/codex"}).encode()
 subprocess.run(['/usr/bin/defaults','write',ID,native_key,'-data',native_encoded.hex()],check=True,capture_output=True)
-E=APP/'Contents/MacOS/AgentAttentionRouter'; child=None; log=(W/'app.log').open('wb')
+E=APP/'Contents/MacOS/CueportApp'; child=None; log=(W/'app.log').open('wb')
 def start(args,root,mode,restored):
  global child
  child=subprocess.Popen([str(E),*args,'--no-notifications'],stdout=log,stderr=log)

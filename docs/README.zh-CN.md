@@ -1,4 +1,4 @@
-# Agent Attention Router
+# Cueport
 
 帮助你集中查看多个 Codex 终端的待关注事项，并准确返回原来的 iTerm2 会话。
 
@@ -16,7 +16,7 @@
 ## 开始使用
 
 1. 从本仓库 Releases 下载选定版本的 arm64 应用包，核对校验和，解压到
-   `~/Applications/Agent Attention Router.app`。
+   `~/Applications/Cueport.app`。
 2. 打开设置，在 Your connection → Opening the app 选择
    **Set up connected bridge…**，退出并重开应用，确认 Connected bridge。
 3. 新会话使用 **Copy launch command**；继续旧项目使用
@@ -43,7 +43,7 @@
 
 单独下载原生 `codex` 文件不能替代完整官方后端安装。完整 Codex 依赖、账号、
 后端和 iTerm2 不随应用包提供；应用不会自动安装、启动或重启该后端。
-[官网](https://liyunhui0707.github.io/agent-attention-router/)提供实际已发布版本下载。
+[官网](https://liyunhui0707.github.io/cueport/)提供实际已发布版本下载。
 
 本轮自动检查219项通过；10分钟空闲接收器121样本，峰值78.719MiB。
 原生通知为5次准确返回、1次焦点核验安全拒绝；30次目标、Air新候选通知、

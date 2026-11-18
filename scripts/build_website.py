@@ -14,8 +14,8 @@ def build(output, release_file=ROOT / "website/release.json"):
     version = facts["version"]
     if not re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+-(?:alpha|beta|rc)\.[1-9][0-9]*", version):
         raise ValueError("Choose an explicit experimental release version")
-    release = "https://github.com/liyunhui0707/agent-attention-router/releases/tag/v" + version
-    download = "https://github.com/liyunhui0707/agent-attention-router/releases/download/v" + version + "/AgentAttentionRouter-" + version + "-macos-arm64.zip"
+    release = "https://github.com/liyunhui0707/cueport/releases/tag/v" + version
+    download = "https://github.com/liyunhui0707/cueport/releases/download/v" + version + ("/AgentAttentionRouter-" if version == "0.1.0-alpha.3" else "/Cueport-") + version + "-macos-arm64.zip"
     if facts["release_url"] != release or facts["download_url"] != download or not re.fullmatch(r"[a-f0-9]{64}", facts["sha256"]):
         raise ValueError("Release facts contain a mismatched target or digest")
     replacements = {"VERSION": version, "RELEASE_URL": release, "DOWNLOAD_URL": download,
@@ -29,7 +29,7 @@ def build(output, release_file=ROOT / "website/release.json"):
         raise ValueError("Unresolved site content")
     output.mkdir(parents=True, exist_ok=True)
     (output / "index.html").write_text(source)
-    for name in ["styles.css", "site.js", "mark.svg", "release.json"]:
+    for name in ["styles.css", "site.js", "cueport.svg", "release.json"]:
         shutil.copyfile(release_file if name == "release.json" else ROOT / "website" / name, output / name)
     (output / ".nojekyll").write_text("")
     return facts

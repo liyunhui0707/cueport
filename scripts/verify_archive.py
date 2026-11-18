@@ -9,7 +9,7 @@ import zipfile
 
 root = pathlib.Path(__file__).resolve().parent.parent
 parser = argparse.ArgumentParser(description=__doc__)
-parser.add_argument("--archive", type=pathlib.Path, default=root / "build/AgentAttentionRouter-local-arm64.zip")
+parser.add_argument("--archive", type=pathlib.Path, default=root / "build/artifacts.noindex/Cueport-local-arm64.zip")
 parser.add_argument("--receipt", type=pathlib.Path, default=root / "build/artifact-receipt.json")
 options = parser.parse_args()
 archive = options.archive.absolute()
@@ -18,18 +18,18 @@ with zipfile.ZipFile(archive) as package:
         path = pathlib.PurePosixPath(name)
         assert not path.is_absolute() and ".." not in path.parts and "\\" not in name
         assert name == "__MACOSX/" or name.startswith((
-            "Agent Attention Router.app/", "__MACOSX/Agent Attention Router.app/"
+            "Cueport.app/", "__MACOSX/Cueport.app/"
         )), "Unexpected content outside the application bundle"
 with tempfile.TemporaryDirectory(prefix="aar-archive-") as temporary:
     destination = pathlib.Path(temporary).resolve()
     subprocess.run(["/usr/bin/ditto", "-x", "-k", str(archive), str(destination)], check=True)
-    app = destination / "Agent Attention Router.app"
+    app = destination / "Cueport.app"
     subprocess.run(["/usr/bin/codesign", "--verify", "--deep", "--strict", str(app)], check=True)
     helper = app / "Contents/MacOS/aar"
-    for image in [helper, helper.with_name("AgentAttentionRouter")]:
+    for image in [helper, helper.with_name("CueportApp"), helper.with_name("cueport")]:
         assert subprocess.check_output(["/usr/bin/lipo", "-archs", str(image)]).strip() == b"arm64"
     result = subprocess.run([str(helper), "doctor", "--data-dir", str(destination / "data")], check=True, capture_output=True)
-    assert b"Agent Attention Router" in result.stdout
+    assert b"Cueport" in result.stdout
     hooks = destination / "hooks.json"
     original = {"hooks": {"Stop": [{"hooks": [{"type": "command", "command": "foreign-tool"}]}]}}
     hooks.write_text(json.dumps(original))

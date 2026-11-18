@@ -93,7 +93,7 @@ do {
         print("\(state.sessions.count) sessions · \(state.sessions.values.filter(\.needsAttention).count) need attention")
         for session in state.sortedSessions { print("\(session.project) · \(session.execution.rawValue) · \(session.outstanding.count) requests") }
     case "doctor":
-        print("Agent Attention Router · local diagnostics")
+        print("Cueport · local diagnostics")
         print("Loaded helper build: \(MachOBuildIdentity.loadedUUID() ?? "unverified")")
         print("OS: \(ProcessInfo.processInfo.operatingSystemVersionString)")
         print("iTerm2: \(FileManager.default.fileExists(atPath: "/Applications/iTerm.app") ? "installed" : "not found in /Applications")")
@@ -102,21 +102,21 @@ do {
         print("No credentials, prompts, terminal contents or config values are included.")
     default:
         print("""
-        Agent Attention Router — Never miss an agent that needs you.
-        aar hook                         Receive a Codex Hook on stdin; silent and observational
-        aar install-hooks [--apply]       Preview or merge lifecycle Hooks, with backup
-        aar uninstall-hooks [--apply]     Remove only this exact installation's handlers
-          --executable /absolute/aar      Stable helper path (use the same path to uninstall)
+        Cueport — Never miss an agent that needs you.
+        cueport hook                         Receive a Codex Hook on stdin; silent and observational
+        cueport install-hooks [--apply]       Preview or merge lifecycle Hooks, with backup
+        cueport uninstall-hooks [--apply]     Remove only this exact installation's handlers
+          --executable /absolute/cueport      Stable helper path (use the same path to uninstall)
           --hooks-file /path/hooks.json   Override destination for isolated testing
           --data-dir /private/directory   Override private local storage
-        aar doctor                       Print content-free environment diagnostics
-        aar check-bridge-dependencies    Check exact native dependency version; no session/model task
-        aar status                       Read the persisted state
-        aar codex --data-dir PATH --     Connected native TUI (Codex \(BridgeCompatibility.supportedDescription))
-        aar codex --data-dir PATH -- resume [SESSION_UUID]
+        cueport doctor                       Print content-free environment diagnostics
+        cueport check-bridge-dependencies    Check exact native dependency version; no session/model task
+        cueport status                       Read the persisted state
+        cueport codex --data-dir PATH --     Connected native TUI (Codex \(BridgeCompatibility.supportedDescription))
+        cueport codex --data-dir PATH -- resume [SESSION_UUID]
                                          Native restore picker or an explicit conversation
           --native-codex /path/codex       Optional native arm64 dependency before --; same exact version required
-        aar replay --file event.json      Queue a sanitized schema-v1 event
+        cueport replay --file event.json      Queue a sanitized schema-v1 event
         """)
     }
 } catch {

@@ -8,13 +8,6 @@ struct AppMain {
     @MainActor static func main() {
         let app = autoreleasepool { NSApplication.shared }
         app.setActivationPolicy(.accessory)
-        autoreleasepool {
-            let menu = NSMenu(), applicationItem = NSMenuItem(), applicationMenu = NSMenu()
-            let quit = NSMenuItem(title: "Quit Cueport", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
-            quit.target = app; quit.keyEquivalentModifierMask = .command
-            applicationMenu.addItem(quit); applicationItem.submenu = applicationMenu
-            menu.addItem(applicationItem); app.mainMenu = menu
-        }
         if let index = CommandLine.arguments.firstIndex(of: "--render-previews"), CommandLine.arguments.count > index + 1 {
             PreviewRenderer.render(to: URL(fileURLWithPath: CommandLine.arguments[index + 1])); return
         }
@@ -59,6 +52,11 @@ struct AppMain {
     private let review = Bundle.main.object(forInfoDictionaryKey: "AARBuildChannel") as? String == "review"
     private let validationLabel = Bundle.main.object(forInfoDictionaryKey: "AARValidationBuild") as? Bool == true
     func applicationDidFinishLaunching(_ notification: Notification) {
+        // Drain temporary startup/AppKit objects before the first idle wait;
+        // keep only the model, status item and registered callbacks alive.
+        autoreleasepool { configureApplication() }
+    }
+    private func configureApplication() {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         // Use the original Cueport template without loading symbol/font machinery
         // on every background receiver launch.
@@ -86,9 +84,10 @@ struct AppMain {
         model.onRoutingTest = { [weak self] in self?.routingTest() }
         model.onDeliveryTest = { [weak self] in self?.deliveryTest() }
         model.onDockVisibilityChanged = { visible in
+            if visible { Self.prepareApplicationMenu() }
             NSApp.setActivationPolicy(visible ? .regular : .accessory)
         }
-        if model.showInDock { NSApp.setActivationPolicy(.regular) }
+        if model.showInDock { Self.prepareApplicationMenu(); NSApp.setActivationPolicy(.regular) }
         if Bundle.main.bundleIdentifier != nil { UNUserNotificationCenter.current().delegate = self }
         if !model.demo, CommandLine.arguments.contains("--clear-notifications") {
             // Only this app's old banners/requests; durable attention is untouched.
@@ -119,8 +118,21 @@ struct AppMain {
         NSApp.activate(ignoringOtherApps: true)
     }
     @objc private func settingsFromDock() { openWindow(settings: true) }
+    private static var applicationMenuPrepared = false
+    private static func prepareApplicationMenu() {
+        guard !applicationMenuPrepared else { return }
+        // The background-only receiver has no application-menu interaction.
+        // Build it when a surface is shown, retaining normal Command-Q behavior.
+        let menu = NSMenu(), applicationItem = NSMenuItem(), applicationMenu = NSMenu()
+        let quit = NSMenuItem(title: "Quit Cueport", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
+        quit.target = NSApp; quit.keyEquivalentModifierMask = .command
+        applicationMenu.addItem(quit); applicationItem.submenu = applicationMenu
+        menu.addItem(applicationItem); NSApp.mainMenu = menu
+        applicationMenuPrepared = true
+    }
     @objc func toggle() {
         guard let button = statusItem.button else { return }
+        Self.prepareApplicationMenu()
         if popover.isShown { popover.performClose(nil) }
         else {
             model.refreshOpenThreads(force: true)
@@ -170,6 +182,7 @@ struct AppMain {
         } catch { /* Isolated visual-test evidence does not affect the product. */ }
     }
     func openWindow(settings: Bool) {
+        Self.prepareApplicationMenu()
         popover.performClose(nil)
         let title = (settings ? "Settings — Cueport" : "Diagnostics — Cueport") + (review ? " — TEST" : "")
         if let existing = windows.first(where: { $0.title == title }) {

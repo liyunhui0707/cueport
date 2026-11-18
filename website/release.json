@@ -1,0 +1,10 @@
+{
+  "version": "0.1.0-alpha.2",
+  "release_url": "https://github.com/liyunhui0707/agent-attention-router/releases/tag/v0.1.0-alpha.2",
+  "download_url": "https://github.com/liyunhui0707/agent-attention-router/releases/download/v0.1.0-alpha.2/AgentAttentionRouter-0.1.0-alpha.2-macos-arm64.zip",
+  "sha256": "a9925e5b60227465ae72001af22ff64e1580b4184b1c56077e57a5d28948c395",
+  "supported_codex": ["0.169.0"],
+  "notice": "当前公开的 alpha.2 不支持运行中透明重连。长时任务请留意连接状态；整改候选仍在验收。",
+  "entry_description": "独立 macOS 应用与菜单栏入口。Dock 显示选项尚未包含在此公开版本。",
+  "recovery_description": "当前公开版发生断线时，需要保存草稿并使用应用设置里的恢复命令重新接入。"
+}

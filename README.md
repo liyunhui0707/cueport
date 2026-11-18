@@ -10,7 +10,7 @@ return to the exact registered terminal without searching for it.
 or resume workflow below. Ordinary unwrapped Codex sessions are not automatically
 attached. This is not complete P0/ordinary-CLI support.
 
-[中文](docs/README.zh-CN.md) · [Install and update](docs/install.md) ·
+[Product website](https://liyunhui0707.github.io/agent-attention-router/) · [中文](docs/README.zh-CN.md) · [Install and update](docs/install.md) ·
 [Compatibility and acceptance](docs/compatibility.md) · [Quality evidence](docs/quality.md) · [Security](SECURITY.md) · [Third-party notices](THIRD_PARTY_NOTICES.md)
 
 ![Native grouped panel with synthetic sample sessions](docs/images/open-threads-dark.png)

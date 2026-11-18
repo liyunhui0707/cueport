@@ -1,10 +1,13 @@
 {
-  "version": "0.1.0-alpha.2",
-  "release_url": "https://github.com/liyunhui0707/agent-attention-router/releases/tag/v0.1.0-alpha.2",
-  "download_url": "https://github.com/liyunhui0707/agent-attention-router/releases/download/v0.1.0-alpha.2/AgentAttentionRouter-0.1.0-alpha.2-macos-arm64.zip",
-  "sha256": "a9925e5b60227465ae72001af22ff64e1580b4184b1c56077e57a5d28948c395",
-  "supported_codex": ["0.169.0"],
-  "notice": "当前公开的 alpha.2 不支持运行中透明重连。长时任务请留意连接状态；整改候选仍在验收。",
-  "entry_description": "独立 macOS 应用与菜单栏入口。Dock 显示选项尚未包含在此公开版本。",
-  "recovery_description": "当前公开版发生断线时，需要保存草稿并使用应用设置里的恢复命令重新接入。"
+  "version": "0.1.0-alpha.3",
+  "release_url": "https://github.com/liyunhui0707/agent-attention-router/releases/tag/v0.1.0-alpha.3",
+  "download_url": "https://github.com/liyunhui0707/agent-attention-router/releases/download/v0.1.0-alpha.3/AgentAttentionRouter-0.1.0-alpha.3-macos-arm64.zip",
+  "sha256": "3c5291546b7fab61846677ed9ed55ed2e847de9467082efaa4fb34b57505e45d",
+  "supported_codex": [
+    "0.169.0",
+    "0.170.0"
+  ],
+  "notice": "原生验收尚未完整完成，保留一次焦点核验安全拒绝，长测仍在进行。请按实验版本使用并阅读版本说明。",
+  "entry_description": "独立 macOS 应用与菜单栏入口。可在 Settings 中开启 Show application in Dock，显示独立 Dock 图标。",
+  "recovery_description": "应用会为同一原始终端尝试有界连接恢复。未恢复时先保存草稿，再用设置里的恢复命令接入；不会重发任务或批准请求。"
 }

@@ -10,6 +10,7 @@ public final class LocalStore: @unchecked Sendable {
     public init(root: URL) throws {
         self.root = root.standardizedFileURL
         try Self.ensurePrivateDirectory(self.root)
+        try Self.requireNotRelocated(self.root)
         try Self.ensurePrivateDirectory(inbox)
         var info = stat()
         guard lstat(self.root.path, &info) == 0 else { throw RouterError.unsafeStorage }
@@ -75,6 +76,7 @@ public final class LocalStore: @unchecked Sendable {
         guard lstat(root.path, &info) == 0, let original = rootIdentity,
               info.st_dev == original.0, info.st_ino == original.1 else { throw RouterError.unsafeStorage }
         try Self.ensurePrivateDirectory(root)
+        try Self.requireNotRelocated(root)
     }
     /// Recover a missing inbox while preserving the locked root/snapshot. A
     /// replaced root or a symlink/public replacement requires explicit repair.
@@ -126,6 +128,22 @@ public final class LocalStore: @unchecked Sendable {
               (info.st_mode & S_IFMT) == S_IFREG else { close(fd); throw RouterError.unsafeStorage }
         guard flock(fd, LOCK_EX | LOCK_NB) == 0 else { close(fd); throw RouterError.consumerAlreadyRunning }
         return FileHandle(fileDescriptor: fd, closeOnDealloc: true)
+    }
+    public func lockBridgeWriter() throws -> FileHandle {
+        try verifyRoot()
+        let file = root.appendingPathComponent("writers.lock")
+        let fd = open(file.path, O_RDWR | O_CREAT | O_NOFOLLOW | O_CLOEXEC, 0o600)
+        guard fd >= 0 else { throw RouterError.unsafeStorage }
+        var info = stat()
+        guard fstat(fd, &info) == 0, info.st_uid == getuid(), info.st_mode & 0o077 == 0,
+              info.st_mode & S_IFMT == S_IFREG else { close(fd); throw RouterError.unsafeStorage }
+        guard flock(fd, LOCK_SH | LOCK_NB) == 0 else { close(fd); throw RouterError.profileMigrating }
+        return FileHandle(fileDescriptor: fd, closeOnDealloc: true)
+    }
+    private static func requireNotRelocated(_ root: URL) throws {
+        var info = stat()
+        if lstat(root.appendingPathComponent("bridge-relocated.json").path, &info) == 0 { throw RouterError.relocatedStorage }
+        guard errno == ENOENT else { throw RouterError.unsafeStorage }
     }
     public func load() throws -> RouterState {
         try verifyRoot()

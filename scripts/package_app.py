@@ -23,7 +23,7 @@ if version is not None and re.fullmatch(r"(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[
 build_number = (root / "BUILD_NUMBER").read_text().strip() if version is not None else None
 if build_number is not None and re.fullmatch(r"[1-9][0-9]*(?:\.[0-9]+){0,2}", build_number) is None:
     raise SystemExit("BUILD_NUMBER must be an explicit positive numeric bundle build")
-app = (options.output or root / "build" / "Agent Attention Router.app").absolute()
+app = (options.output or root / "build" / "artifacts.noindex" / "Agent Attention Router.app").absolute()
 bundle_id = "org.agentattentionrouter.review" if options.channel == "review" else "org.agentattentionrouter.local-development"
 if options.channel == "review" and options.output is None:
     raise SystemExit("Review builds require an explicit --output; the daily bundle is preserved")
@@ -63,6 +63,7 @@ info = {
     "CFBundleName": "Agent Attention Router",
     "CFBundleDisplayName": "Attention Router TEST" if options.channel == "review" else "Agent Attention Router",
     "CFBundlePackageType": "APPL",
+    "LSApplicationCategoryType": "public.app-category.developer-tools",
     "CFBundleIconFile": "AppIcon",
     "CFBundleInfoDictionaryVersion": "6.0",
     "CFBundleSupportedPlatforms": ["MacOSX"],

@@ -9,6 +9,7 @@ public struct CodexProtocolObserver {
     private let binding: ProtocolOriginBinding
     private let project: String
     private let workerBuildUUID: String?
+    private let nativeClientVersion: String?
     private var threadProjects: [String: String] = [:]
     private var pendingStarts: [String: Int] = [:]
     private var retirementSequence = 0
@@ -19,6 +20,9 @@ public struct CodexProtocolObserver {
     public private(set) var coverageNoticeCount = 0
     private static let nonInteractiveServerRequests: Set<String> = ["item/tool/call", "account/chatgptAuthTokens/refresh", "attestation/generate", "currentTime/read"]
     private var threads: Set<String> = []
+    /// IDs only, carried within the same authenticated worker lifetime. A new
+    /// launcher starts empty and never guesses completion from old history.
+    public private(set) var recoveryTurns: [String: String] = [:]
     // Keep retired identities so a resume gets a fresh reference. An old
     // notification must not follow another subscription in the same TUI.
     private var subscriptions: [String: ProtocolOriginBinding] = [:]
@@ -32,9 +36,14 @@ public struct CodexProtocolObserver {
     private static let pickerMetadataMethods: Set<String> = ["thread/list", "thread/read", "thread/turns/list", "thread/items/list"]
     private static let quietMetadataMethods: Set<String> = ["model/list", "app/list", "skills/list", "plugin/list",
         "mcpServerStatus/list", "config/read", "configRequirements/read", "thread/list", "thread/read", "thread/turns/list", "thread/items/list"]
-    public init(binding: ProtocolOriginBinding, project: String, workerBuildUUID: String? = nil) {
+    public init(binding: ProtocolOriginBinding, project: String, workerBuildUUID: String? = nil, nativeClientVersion: String? = nil,
+                recoveryTurns: [String: String] = [:]) {
         self.binding = binding; self.project = String(project.prefix(128))
         self.workerBuildUUID = MachOBuildIdentity.canonicalUUID(workerBuildUUID)
+        self.nativeClientVersion = nativeClientVersion.flatMap { BridgeCompatibility.supportedVersions.contains($0) ? $0 : nil }
+        self.recoveryTurns = Dictionary(uniqueKeysWithValues: recoveryTurns.filter {
+            !$0.key.isEmpty && $0.key.utf8.count <= 256 && !$0.value.isEmpty && $0.value.utf8.count <= 256
+        }.prefix(128).map { ($0.key, $0.value) })
     }
     private func identifier(_ value: Any?) -> String? {
         guard let value else { return nil }
@@ -60,7 +69,7 @@ public struct CodexProtocolObserver {
     private func event(_ kind: EventKind, thread: String, turn: String? = nil,
                        request: String? = nil, questions: [String] = [], now: Date) -> AgentEvent {
         AgentEvent(kind: kind, sessionID: thread, turnID: turn, requestID: request,
-            questionIDs: questions, protocolBinding: subscriptions[thread] ?? binding, workerBuildUUID: workerBuildUUID,
+            questionIDs: questions, protocolBinding: subscriptions[thread] ?? binding, workerBuildUUID: workerBuildUUID, nativeClientVersion: nativeClientVersion,
             project: threadProjects[thread] ?? project, timestamp: now, source: "codex-protocol")
     }
     private mutating func coverage(_ issue: ProtocolCoverageIssue, thread: String, now: Date) -> [AgentEvent] {
@@ -90,6 +99,7 @@ public struct CodexProtocolObserver {
         "protocol-input-" + StableDigest.hex((try? JSONEncoder().encode([(subscriptions[thread] ?? binding).reference, id] + components)) ?? Data())
     }
     private mutating func retire(_ thread: String, now: Date) -> [AgentEvent] {
+        recoveryTurns.removeValue(forKey: thread)
         guard threads.remove(thread) != nil else { return [] }
         retirementSequence += 1; retiredAt[thread] = retirementSequence
         approvals = approvals.filter { $0.value.thread != thread }
@@ -159,7 +169,25 @@ public struct CodexProtocolObserver {
             case "idle": registration.executionObservation = .idle
             default: registration.executionObservation = .unknown
             }
-            return [registration]
+            var events = [registration]
+            if let turns = thread["turns"] as? [[String: Any]], turns.count <= 10_000 {
+                let active = turns.filter { $0["status"] as? String == "inProgress" }
+                if registration.executionObservation == .idle, active.isEmpty,
+                   let expected = recoveryTurns[threadID] {
+                    let matching = turns.filter { textID($0["id"]) == expected }
+                    if matching.count == 1, let status = matching[0]["status"] as? String,
+                       ["completed", "interrupted", "failed"].contains(status) {
+                        recoveryTurns.removeValue(forKey: threadID)
+                        var stopped = event(status == "completed" ? .turnStopped : .interrupted,
+                            thread: threadID, turn: expected, now: now)
+                        stopped.recoveredFromHistory = true
+                        events.append(stopped)
+                    }
+                }
+                if registration.executionObservation == .running, active.count == 1,
+                   let turn = textID(active[0]["id"]) { recoveryTurns[threadID] = turn }
+            }
+            return events
         }
         let legacyApproval = ["execCommandApproval", "applyPatchApproval"].contains(method ?? "")
         guard let thread = textID(params["threadId"]) ?? (legacyApproval ? textID(params["conversationId"]) : nil), threads.contains(thread) else {
@@ -174,13 +202,17 @@ public struct CodexProtocolObserver {
         case "thread/closed", "thread/archived", "thread/deleted":
             return retire(thread, now: now)
         case "turn/started":
-            return [event(.turnStarted, thread: thread, turn: textID((params["turn"] as? [String: Any])?["id"]) ?? turn, now: now)]
+            let started = textID((params["turn"] as? [String: Any])?["id"]) ?? turn
+            recoveryTurns[thread] = started
+            return [event(.turnStarted, thread: thread, turn: started, now: now)]
         case "turn/completed":
             let completed = params["turn"] as? [String: Any] ?? [:]
             let status = completed["status"] as? String
             guard ["completed", "interrupted", "failed"].contains(status) else { return disconnect(now: now) }
+            let completedID = textID(completed["id"]) ?? turn
+            if recoveryTurns[thread] == completedID { recoveryTurns.removeValue(forKey: thread) }
             return [event(status == "completed" ? .turnStopped : .interrupted, thread: thread,
-                turn: textID(completed["id"]) ?? turn, now: now)]
+                turn: completedID, now: now)]
         case "item/commandExecution/requestApproval", "item/fileChange/requestApproval", "item/permissions/requestApproval", "mcpServer/elicitation/request":
             if method == "mcpServer/elicitation/request" {
                 guard let id else { return coverage(.unsupportedInput, thread: thread, now: now) }
@@ -271,9 +303,13 @@ public struct CodexProtocolObserver {
         }
     }
     /// A gap/close revokes routing and marks uncertainty; never ends the thread.
-    public mutating func disconnect(now: Date = Date()) -> [AgentEvent] {
+    public mutating func disconnect(now: Date = Date(), recoveringUntil: Date? = nil) -> [AgentEvent] {
         guard !stopped else { return [] }; stopped = true
-        return threads.sorted().map { event(.sourceLost, thread: $0, now: now) }
+        return threads.sorted().map {
+            var value = event(.sourceLost, thread: $0, now: now)
+            value.transportRecoveryDeadline = recoveringUntil
+            return value
+        }
     }
     public mutating func observationGap(now: Date = Date()) -> [AgentEvent] {
         guard !stopped else { return [] }

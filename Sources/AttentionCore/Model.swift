@@ -47,9 +47,15 @@ public struct AgentEvent: Codable, Equatable, Sendable {
     public var protocolBinding: ProtocolOriginBinding?
     /// Diagnostic metadata from the worker's mapped executable; never a routing key.
     public var workerBuildUUID: String?
+    public var nativeClientVersion: String?
     public var coverageIssue: ProtocolCoverageIssue?
     /// Current runtime status from a correlated protocol registration, not a new turn.
     public var executionObservation: Execution?
+    /// Transport recovery only; never authorizes routing or resolves requests.
+    public var transportRecoveryDeadline: Date?
+    /// A matching previously observed active turn was explicitly completed in
+    /// native resume metadata. Timestamp is observation time, not model latency.
+    public var recoveredFromHistory: Bool?
     public var project: String
     public var timestamp: Date
     public var source: String
@@ -57,7 +63,7 @@ public struct AgentEvent: Codable, Equatable, Sendable {
                 turnID: String? = nil, requestID: String? = nil, questionIDs: [String] = [],
                 terminal: TerminalIdentity? = nil, terminalHints: [TerminalIdentity]? = nil,
                 processOriginHint: ProcessOriginHint? = nil, protocolBinding: ProtocolOriginBinding? = nil,
-                workerBuildUUID: String? = nil,
+                workerBuildUUID: String? = nil, nativeClientVersion: String? = nil,
                 executionObservation: Execution? = nil, project: String = "Unknown project",
                 timestamp: Date = Date(), source: String = "codex-hook") {
         self.id = id; self.kind = kind; self.sessionID = sessionID; self.turnID = turnID
@@ -65,6 +71,7 @@ public struct AgentEvent: Codable, Equatable, Sendable {
         self.processOriginHint = processOriginHint
         self.protocolBinding = protocolBinding
         self.workerBuildUUID = workerBuildUUID
+        self.nativeClientVersion = nativeClientVersion
         self.executionObservation = executionObservation
         self.project = project; self.timestamp = timestamp; self.source = source
     }
@@ -86,6 +93,10 @@ public struct AgentEvent: Codable, Equatable, Sendable {
             guard source == "codex-protocol", protocolBinding != nil,
                   MachOBuildIdentity.canonicalUUID(workerBuildUUID) == workerBuildUUID else { throw RouterError.invalidEvent }
         }
+        if let nativeClientVersion {
+            guard source == "codex-protocol", protocolBinding != nil,
+                  BridgeCompatibility.supportedVersions.contains(nativeClientVersion) else { throw RouterError.invalidEvent }
+        }
         if coverageIssue != nil {
             guard kind == .activity, source == "codex-protocol", protocolBinding != nil, requestID == id,
                   id.range(of: #"^coverage-[a-f0-9]{64}$"#, options: .regularExpression) != nil else { throw RouterError.invalidEvent }
@@ -93,6 +104,18 @@ public struct AgentEvent: Codable, Equatable, Sendable {
         if let executionObservation {
             guard kind == .sessionStarted, source == "codex-protocol", protocolBinding != nil,
                   [.running, .idle, .unknown].contains(executionObservation) else { throw RouterError.invalidEvent }
+        }
+        if let deadline = transportRecoveryDeadline {
+            guard kind == .sourceLost, source == "codex-protocol", protocolBinding != nil,
+                  deadline.timeIntervalSince1970.isFinite,
+                  (0...BridgeReconnectPolicy.recoveryWindow).contains(deadline.timeIntervalSince(timestamp))
+            else { throw RouterError.invalidEvent }
+        }
+        if let recoveredFromHistory {
+            guard recoveredFromHistory, [.turnStopped, .interrupted].contains(kind),
+                  source == "codex-protocol", protocolBinding != nil,
+                  turnID.map({ !$0.isEmpty && $0.utf8.count <= 256 }) == true
+            else { throw RouterError.invalidEvent }
         }
     }
 }
@@ -165,7 +188,7 @@ public struct AgentSession: Codable, Equatable, Identifiable, Sendable {
 }
 
 public enum RouterError: Error, LocalizedError {
-    case invalidEvent, unsafeStorage, oversizedPayload, missingIdentity, terminalUnavailable, sessionNotFound, ambiguousSession, commandFailed, consumerAlreadyRunning, unverifiedOrigin
+    case invalidEvent, unsafeStorage, oversizedPayload, missingIdentity, terminalUnavailable, sessionNotFound, ambiguousSession, commandFailed, consumerAlreadyRunning, unverifiedOrigin, profileMigrating, relocatedStorage
     public var errorDescription: String? {
         switch self {
         case .invalidEvent: "The event does not match the supported schema."
@@ -177,6 +200,8 @@ public enum RouterError: Error, LocalizedError {
         case .ambiguousSession: "More than one terminal matched. No session was selected."
         case .commandFailed: "The terminal could not be focused. Check Diagnostics and iTerm2’s API permissions."
         case .consumerAlreadyRunning: "Another Attention Router instance is already monitoring this data directory."
+        case .profileMigrating: "This bridge profile is being migrated. Wait for migration to finish, then copy a new launch/resume command from the installed app."
+        case .relocatedStorage: "This bridge profile was relocated. Open the installed application and use its current Copy launch/resume command; the retained old profile will not be reopened."
         case .unverifiedOrigin: "The original foreground Codex process could not be verified. No other terminal was selected."
         }
     }

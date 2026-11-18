@@ -87,4 +87,18 @@ final class BridgeWorkerBuildTests: XCTestCase {
         XCTAssertEqual(lost.first?.workerBuildUUID, current)
         XCTAssertFalse(events.contains { $0.kind == .humanApprovalPending || $0.kind == .requestResolved })
     }
+    func testWorkerReportsItsPinnedNativeClientVersionAndOldRecordsStayUnknown() throws {
+        var observer = CodexProtocolObserver(binding: binding(), project: "sample", nativeClientVersion: "0.170.0")
+        _ = observer.observe(Data(#"{"id":1,"method":"thread/resume"}"#.utf8), from: .client)
+        let events = observer.observe(Data(#"{"id":1,"result":{"thread":{"id":"s","status":{"type":"idle"}}}}"#.utf8), from: .server)
+        var state = RouterState()
+        for event in events { try state.apply(event) }
+        let decoded = try JSONDecoder().decode(RouterState.self, from: JSONEncoder().encode(state))
+        XCTAssertEqual(health(decoded).nativeVersion, "0.170.0")
+        XCTAssertTrue(health(decoded).detail.contains("Running native Codex · 0.170.0"))
+        var invalid = registration(current); invalid.nativeClientVersion = "0.171.0"
+        XCTAssertThrowsError(try invalid.validate())
+        invalid.nativeClientVersion = "0.170.0"; invalid.source = "codex-hook"
+        XCTAssertThrowsError(try invalid.validate())
+    }
 }

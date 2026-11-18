@@ -37,7 +37,7 @@ class CLITests(unittest.TestCase):
             result = subprocess.run([str(CLI), "check-bridge-dependencies", "--native-codex", str(executable)],
                                     env=self.env, capture_output=True, timeout=2)
             self.assertNotEqual(result.returncode, 0)
-            self.assertIn(b"reviewed native Codex", result.stderr)
+            self.assertIn(b"Supported native Codex versions", result.stderr)
 
     @unittest.skipUnless(pathlib.Path("/Applications/iTerm.app/Contents/Resources/utilities/it2").is_file(), "iTerm utility required")
     def test_native_version_probe_accepts_a_slow_initial_native_launch(self):

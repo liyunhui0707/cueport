@@ -78,7 +78,7 @@ struct UtilityView: View {
                                 .help("Choose an existing conversation in the native Codex picker.")
                         }
                         Spacer()
-                        Text(model.bridgePOC ? "Private bridge POC" : model.hasRoutingPOC ? "Standalone routing POC" : "Monitoring via Hooks").font(.system(size: 10)).foregroundStyle(.tertiary)
+                        Text(model.bridgePOC ? "Connected bridge" : model.hasRoutingPOC ? "Standalone routing POC" : "Monitoring via Hooks").font(.system(size: 10)).foregroundStyle(.tertiary)
                     }
                     if model.bridgePOC {
                         Text("Continue an existing conversation with Copy resume command. Run it from your project directory to open the native picker directly. It does not clean up existing thread records.")
@@ -105,12 +105,21 @@ struct UtilityView: View {
         NSPasteboard.general.clearContents(); NSPasteboard.general.setString(command, forType: .string)
         model.message = model.bridgePOC
             ? (resume ? "Resume command copied. Run it from your project directory in an iTerm2 Shell, then choose an existing conversation."
-                      : "Launch command copied. Run it in a dedicated iTerm2 pane for this local POC.")
+                      : "Launch command copied. Run it from your project directory in an iTerm2 Shell.")
             : "Setup command copied. Run it in iTerm2 to review the merge plan before applying."
     }
     var startupContent: some View {
         VStack(alignment: .leading, spacing: 9) {
             Text("OPENING THE APP").font(.system(size: 10, weight: .semibold)).foregroundStyle(.secondary)
+            Text("Application · " + (Bundle.main.object(forInfoDictionaryKey: "AARReleaseVersion") as? String ?? "Unversioned development build")
+                 + " · Build " + (Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "unversioned"))
+                .font(.system(size: 11)).foregroundStyle(.secondary)
+            Toggle("Show application in Dock", isOn: $model.showInDock)
+                .toggleStyle(.switch).font(.system(size: 12))
+                .help("Keep an independent application icon in the Dock. Click it to open Attention Router; the menu bar entry stays available.")
+            Text("Application · " + (model.demo ? "/Applications/Agent Attention Router.app" : Bundle.main.bundleURL.path))
+                .font(.system(size: 10)).foregroundStyle(.secondary).textSelection(.enabled)
+                .fixedSize(horizontal: false, vertical: true)
             Text("Current mode · " + model.currentModeDescription).font(.system(size: 12, weight: .medium))
             if !model.startupBlocked {
                 Text("Current folder · " + (model.demo ? "/synthetic/attention-router" : model.root.path)).font(.system(size: 11)).foregroundStyle(.secondary)
@@ -145,6 +154,10 @@ struct UtilityView: View {
             Text(model.demo ? "/synthetic/native/codex" : model.nativeCodexPath ?? "Saved choice unavailable")
                 .font(.system(size: 10)).foregroundStyle(.secondary).textSelection(.enabled)
                 .fixedSize(horizontal: false, vertical: true)
+            if let native = model.nativeCodexPath, !model.demo {
+                Text(CodexInstallation(nativeExecutable: native).updateSummary)
+                    .font(.system(size: 10)).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+            }
             HStack {
                 Button("Choose native file…") { model.chooseNativeCodex() }.controlSize(.small)
                 Button("Use default") { model.useDefaultNativeCodex() }.controlSize(.small)
@@ -153,7 +166,7 @@ struct UtilityView: View {
                     .disabled(model.nativeChoiceUnavailable)
                 if model.checkingNativeCodex { ProgressView().controlSize(.small) }
             }.disabled(model.demo || model.checkingNativeCodex)
-            Text("Only native arm64 Codex \(BridgeCompatibility.nativeClientVersion) is supported. This changes future copied launch/resume commands; open sessions keep running. It does not install dependencies, edit Codex settings or start its backend.")
+            Text("Supported native arm64 Codex: \(BridgeCompatibility.supportedDescription). This changes future copied launch/resume commands; open sessions keep running. It does not install dependencies, edit Codex settings or start its backend.")
                 .font(.system(size: 10)).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
             Text(model.demo ? "Sample preference scope" : model.nativeChoiceScopeDescription)
                 .font(.system(size: 10)).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)

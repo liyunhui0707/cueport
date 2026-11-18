@@ -28,6 +28,8 @@ public struct ProtocolBindingState: Codable, Equatable, Sendable {
     public var updatedAt: Date
     public var workerBuildUUID: String?
     public var workerBuildConflict: Bool?
+    public var recoveryDeadline: Date?
+    public var nativeClientVersion: String?
     public init(binding: ProtocolOriginBinding, connected: Bool, updatedAt: Date, workerBuildUUID: String? = nil, workerBuildConflict: Bool? = nil) {
         self.binding = binding; self.connected = connected; self.updatedAt = updatedAt
         self.workerBuildUUID = workerBuildUUID; self.workerBuildConflict = workerBuildConflict

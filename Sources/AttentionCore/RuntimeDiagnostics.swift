@@ -63,17 +63,23 @@ public enum MachOBuildIdentity {
 /// Advisory build comparison only. Never authorizes routing, resolves requests,
 /// proves process liveness or substitutes for the fresh exact-origin checks.
 public struct BridgeWorkerBuildStatus: Equatable, Sendable {
-    public enum Status: String, Sendable { case current, reconnectNeeded, unverified, helperUnavailable, disconnected, ambiguous, notRegistered, conflicting }
+    public enum Status: String, Sendable { case current, reconnectNeeded, unverified, helperUnavailable, disconnected, recovering, recoveryFailed, ambiguous, notRegistered, conflicting }
     public let status: Status
     public let running: String?
     public let installed: String?
-    public init(session: AgentSession, installedHelper: String?) {
+    public let nativeVersion: String?
+    public init(session: AgentSession, installedHelper: String?, now: Date = Date()) {
         installed = MachOBuildIdentity.canonicalUUID(installedHelper)
         let bindings = Array((session.protocolBindings ?? [:]).values)
         let active = bindings.filter(\.connected)
+        nativeVersion = active.count == 1 ? active[0].nativeClientVersion : nil
         running = active.count == 1 ? MachOBuildIdentity.canonicalUUID(active[0].workerBuildUUID) : nil
         if bindings.isEmpty { status = .notRegistered }
-        else if active.isEmpty { status = .disconnected }
+        else if active.isEmpty {
+            if let deadline = bindings.compactMap(\.recoveryDeadline).max() {
+                status = deadline > now ? .recovering : .recoveryFailed
+            } else { status = .disconnected }
+        }
         else if active.count > 1 { status = .ambiguous }
         else if active[0].workerBuildConflict == true { status = .conflicting }
         else if installed == nil { status = .helperUnavailable }
@@ -87,6 +93,8 @@ public struct BridgeWorkerBuildStatus: Equatable, Sendable {
         case .unverified: "Bridge build unverified · Reconnect to verify"
         case .helperUnavailable: "Installed bridge build unavailable"
         case .disconnected: "Bridge disconnected"
+        case .recovering: "Connection interrupted · Recovering"
+        case .recoveryFailed: "Connection recovery needs help"
         case .ambiguous: "Multiple bridge connections · Build unverified"
         case .notRegistered: "No registered bridge connection"
         case .conflicting: "Bridge build reports conflict · Reconnect to verify"
@@ -96,6 +104,7 @@ public struct BridgeWorkerBuildStatus: Equatable, Sendable {
         var lines = [summary]
         if let running { lines.append("Reported worker · " + running) }
         if let installed { lines.append("Installed helper · " + installed) }
+        lines.append("Running native Codex · " + (nativeVersion ?? "Not reported by this connection"))
         switch status {
         case .reconnectNeeded, .unverified, .conflicting:
             lines.append("Finish current work in Codex, then start a new connected client and resume the thread yourself. Restarting this app does not update an existing bridge.")
@@ -103,6 +112,10 @@ public struct BridgeWorkerBuildStatus: Equatable, Sendable {
             lines.append("The packaged helper could not be identified. Check the app installation before reconnecting.")
         case .ambiguous:
             lines.append("More than one connection reports this thread. Exact return remains unavailable until the source is unique.")
+        case .recovering:
+            lines.append("Codex is reconnecting to the same original terminal. Task and request states remain unconfirmed until observed again. No task is resent by this app.")
+        case .recoveryFailed:
+            lines.append("Save any draft in Codex, exit that client yourself, then use Copy resume command from this app's Settings in your project directory. Old temporary socket commands may no longer work.")
         case .disconnected, .notRegistered:
             lines.append("Start a connected client from the project directory to establish a new source.")
         case .current:

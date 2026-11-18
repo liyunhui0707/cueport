@@ -11,7 +11,7 @@ public enum NativeCodex {
             case .invalidPath: "Choose an absolute path to the native executable named codex."
             case .unavailable: "The selected Codex file is missing, inaccessible or not executable. Choose it again or use the default."
             case .nativeRequired: "Choose the native arm64 Codex binary named codex. Shell/npm wrappers and non-regular files are not accepted."
-            case .unsupportedVersion: "This connection supports native Codex \(BridgeCompatibility.nativeClientVersion) only. Other versions are not enabled."
+            case .unsupportedVersion: "Supported native Codex versions: \(BridgeCompatibility.supportedDescription). Other versions are not enabled."
             case .probeFailed: "The native version check failed or exceeded 30 seconds. Review the selected installation and retry."
             }
         }
@@ -40,8 +40,8 @@ public enum NativeCodex {
         let output: Data
         do { output = try BoundedProcess.output(URL(fileURLWithPath: path), arguments: ["--version"], timeout: 30, maximumBytes: 4096) }
         catch { throw Failure.probeFailed }
-        guard BridgeCompatibility.acceptsNativeVersionOutput(output) else { throw Failure.unsupportedVersion }
-        return BridgeCompatibility.nativeClientVersion
+        guard let version = BridgeCompatibility.nativeVersion(in: output) else { throw Failure.unsupportedVersion }
+        return version
     }
 }
 

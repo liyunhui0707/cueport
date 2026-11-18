@@ -7,6 +7,7 @@ import Darwin
 @MainActor final class RouterModel: ObservableObject {
     @Published var state = RouterState()
     @Published var message: String?
+    @Published private(set) var connectionRecoveryNotice: String?
     @Published var focusInProgress: String?
     @Published var notificationStatus = "Not checked"
     @Published var buildStatus = BuildStatus(running: nil, onDisk: nil)
@@ -24,6 +25,13 @@ import Darwin
     @Published var soundEnabled = UserDefaults.standard.object(forKey: "soundEnabled") as? Bool ?? true { didSet { if !demo { UserDefaults.standard.set(soundEnabled, forKey: "soundEnabled") } } }
     @Published var hideProjects = UserDefaults.standard.bool(forKey: "hideProjects") { didSet { if !demo { UserDefaults.standard.set(hideProjects, forKey: "hideProjects") } } }
     @Published var filterAttention = false
+    @Published var showInDock = UserDefaults.standard.bool(forKey: "showInDock") {
+        didSet {
+            if canSaveNativeChoice { UserDefaults.standard.set(showInDock, forKey: "showInDock") }
+            onDockVisibilityChanged?(showInDock)
+        }
+    }
+    var onDockVisibilityChanged: ((Bool) -> Void)?
     let demo: Bool
     var onCountChanged: ((Int) -> Void)?
     var onNotify: ((AgentEvent, AgentSession) -> Void)?
@@ -95,7 +103,7 @@ import Darwin
     func refreshOpenThreads(force: Bool = false) {
         guard !demo, force || Date().timeIntervalSince(lastTerminalCheck) >= 2 else { return }
         lastTerminalCheck = Date()
-        let pids = Set(state.sessions.values.flatMap { ($0.protocolBindings ?? [:]).values.filter(\.connected).map(\.binding.origin.process.pid) })
+        let pids = Set(state.sessions.values.flatMap { ($0.protocolBindings ?? [:]).values.filter { $0.connected || $0.recoveryDeadline != nil }.map(\.binding.origin.process.pid) })
         let previous = threadVisibility
         let inspected = pids.reduce(into: [Int32: RegisteredProcessStatus]()) { $0[$1] = OpenThreadFilter.inspect($1) }
         let next = OpenThreadFilter(state: state, processes: inspected, currentUID: getuid())
@@ -169,7 +177,7 @@ import Darwin
     func chooseNativeCodex() {
         guard !demo, !checkingNativeCodex else { return }
         let panel = NSOpenPanel()
-        panel.title = "Choose native Codex \(BridgeCompatibility.nativeClientVersion)"
+        panel.title = "Choose supported native Codex"
         panel.message = "Select the native arm64 executable named codex. The read-only version check does not start a conversation."
         panel.canChooseDirectories = false; panel.canChooseFiles = true; panel.allowsMultipleSelection = false
         panel.resolvesAliases = false
@@ -190,13 +198,13 @@ import Darwin
         guard !demo, !checkingNativeCodex else { return }
         checkingNativeCodex = true; nativeCodexStatus = "Checking native file/version · Up to 30 seconds"
         Task { [weak self] in
-            let failure = await Task.detached {
-                do { try NativeCodex.verifyVersion(path); return nil as String? }
-                catch { return error.localizedDescription }
+            let result = await Task.detached {
+                do { return (version: try NativeCodex.verifyVersion(path), failure: nil as String?) }
+                catch { return (version: "", failure: error.localizedDescription) }
             }.value
             guard let self else { return }
             self.checkingNativeCodex = false
-            if let failure {
+            if let failure = result.failure {
                 // An unsuccessful new selection does not replace the existing choice.
                 if !saveChoice { self.nativeCheckFailed = true }
                 self.nativeCodexStatus = failure + (saveChoice ? " Current file choice was kept." : "")
@@ -210,7 +218,7 @@ import Darwin
                 } catch { self.nativeCodexStatus = "The selected native file choice could not be saved."; return }
             }
             self.nativeCheckFailed = false
-            self.nativeCodexStatus = "Native Codex \(BridgeCompatibility.nativeClientVersion) verified · This check does not verify backend, login or iTerm API access"
+            self.nativeCodexStatus = "Native Codex \(result.version) verified · Backend, login and iTerm API access are checked separately"
         }
     }
     func start() {
@@ -393,6 +401,14 @@ import Darwin
         } catch { message = "Notification history could not be saved. Your attention list is preserved; saving will retry." }
     }
     func refreshDiagnostics() {
+        let statuses = state.sessions.values.filter { threadVisibility.visibleThreadIDs.contains($0.id) }
+            .map { BridgeWorkerBuildStatus(session: $0, installedHelper: installedHelperBuildUUID).status }
+        let notice: String? = statuses.contains(.recovering)
+            ? "Connection interrupted · Codex is recovering. Unconfirmed requests are retained."
+            : statuses.contains(.recoveryFailed)
+                ? "Connection recovery needs help · Save any draft, exit that Codex client yourself, then use Copy resume command in Settings."
+                : nil
+        if connectionRecoveryNotice != notice { connectionRecoveryNotice = notice }
         let build = BuildStatus(running: runningBuildUUID, onDisk: RuntimeBuildProbe.diskUUID())
         if buildStatus != build { buildStatus = build }
         let helper = RuntimeBuildProbe.helperDiskUUID()

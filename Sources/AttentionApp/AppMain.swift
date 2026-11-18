@@ -85,6 +85,10 @@ struct AppMain {
         }
         model.onRoutingTest = { [weak self] in self?.routingTest() }
         model.onDeliveryTest = { [weak self] in self?.deliveryTest() }
+        model.onDockVisibilityChanged = { visible in
+            NSApp.setActivationPolicy(visible ? .regular : .accessory)
+        }
+        if model.showInDock { NSApp.setActivationPolicy(.regular) }
         if Bundle.main.bundleIdentifier != nil { UNUserNotificationCenter.current().delegate = self }
         if !model.demo, CommandLine.arguments.contains("--clear-notifications") {
             // Only this app's old banners/requests; durable attention is untouched.
@@ -102,6 +106,19 @@ struct AppMain {
         if !flag && !popover.isShown { toggle() }
         return true
     }
+    func applicationDockMenu(_ sender: NSApplication) -> NSMenu? {
+        let menu = NSMenu()
+        let show = NSMenuItem(title: "Open Attention Router", action: #selector(showFromDock), keyEquivalent: "")
+        show.target = self; menu.addItem(show)
+        let settings = NSMenuItem(title: "Settings…", action: #selector(settingsFromDock), keyEquivalent: "")
+        settings.target = self; menu.addItem(settings)
+        return menu
+    }
+    @objc private func showFromDock() {
+        if !popover.isShown { toggle() }
+        NSApp.activate(ignoringOtherApps: true)
+    }
+    @objc private func settingsFromDock() { openWindow(settings: true) }
     @objc func toggle() {
         guard let button = statusItem.button else { return }
         if popover.isShown { popover.performClose(nil) }

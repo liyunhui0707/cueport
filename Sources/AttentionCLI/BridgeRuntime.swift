@@ -5,7 +5,7 @@ import AttentionCore
 private nonisolated(unsafe) var bridgeTerminated: Int32 = 0
 private func stopBridge(_ signal: Int32) { bridgeTerminated = 1 }
 
-/// Development-only bridge for the source-reviewed installed version. No shell,
+/// Explicit native-TUI bridge for reviewed installed versions. No shell,
 /// PTY emulator, daemon restart, approval writer or model prompt is involved.
 enum BridgeRuntime {
     static let nativeCodex = NativeCodex.defaultPath
@@ -84,7 +84,9 @@ enum BridgeRuntime {
         let root = invocation.dataRoot, launch = invocation.launch
         let nativeCodex = invocation.nativeExecutable ?? Self.nativeCodex
         try LocalStore.requireSeparate(root)
-        _ = try LocalStore(root: root)
+        let launchStore = try LocalStore(root: root)
+        let launchLease = try launchStore.lockBridgeWriter()
+        defer { try? launchLease.close() }
         try LocalStore.requireSeparate(root)
         var stage = "foreground-terminal"
         var diagnostic: [String: Any] = ["stdin_is_terminal": isatty(STDIN_FILENO) == 1,
@@ -116,7 +118,7 @@ enum BridgeRuntime {
         let matches = sessions.filter { $0.tty.flatMap { devices[$0] } == expected.terminalDevice }
         guard matches.count == 1, matches[0].id == selected.id else { throw RouterError.unverifiedOrigin }
         stage = "installed-version"
-        try requireReviewedNativeExecutable(nativeCodex)
+        let nativeVersion = try requireReviewedNativeExecutable(nativeCodex)
         stage = "private-worker"
         var template = Array("/private/tmp/aar-bridge-XXXXXX".utf8CString)
         guard let created = mkdtemp(&template) else { throw RouterError.unsafeStorage }
@@ -124,7 +126,7 @@ enum BridgeRuntime {
         let ticketURL = directory.appendingPathComponent("ticket.json")
         let ticket = Ticket(schema: 1, connectionID: UUID().uuidString, expected: expected,
             terminal: terminal, dataRoot: root, project: URL(fileURLWithPath: FileManager.default.currentDirectoryPath).lastPathComponent,
-            nativeClientVersion: BridgeCompatibility.nativeClientVersion,
+            nativeClientVersion: nativeVersion,
             startupPicker: launch.permitsStartupPickerHandoff ? true : nil,
             nativeExecutable: invocation.nativeExecutable)
         try writePrivate(JSONEncoder().encode(ticket), to: ticketURL)
@@ -144,13 +146,18 @@ enum BridgeRuntime {
         // Use the installed native binary, avoiding npm's extra child process.
         // Remote TUI mode omits cwd unless --cd is explicit, even on this same
         // host. Preserve the owner's actual project rather than daemon defaults.
-        let argv = [nativeCodex] + launch.nativeArguments(
+        let installation = CodexInstallation(nativeExecutable: nativeCodex)
+        let argv = [nativeCodex] + installation.nativeUpdateArguments + launch.nativeArguments(
             endpoint: "unix://" + directory.appendingPathComponent("socket").path,
             directory: FileManager.default.currentDirectoryPath)
         let strings = argv.map { strdup($0) }
         defer { strings.forEach { free($0) } }
         var pointers = strings + [nil]
-        execv(nativeCodex, &pointers)
+        let environment = installation.environment(inheriting: ProcessInfo.processInfo.environment)
+        let environmentStrings = environment.map { strdup($0.key + "=" + $0.value) }
+        defer { environmentStrings.forEach { free($0) } }
+        var environmentPointers = environmentStrings + [nil]
+        execve(nativeCodex, &pointers, &environmentPointers)
         stopChild(worker); cleanup(directory); throw BridgeFailure.startup
     }
     static func cleanup(_ directory: URL) {
@@ -167,8 +174,8 @@ enum BridgeRuntime {
         do { try NativeCodex.inspect(path) }
         catch { throw BridgeFailure.version }
     }
-    static func requireReviewedNativeExecutable(_ path: String) throws {
-        do { try NativeCodex.verifyVersion(path) }
+    @discardableResult static func requireReviewedNativeExecutable(_ path: String) throws -> String {
+        do { return try NativeCodex.verifyVersion(path) }
         catch NativeCodex.Failure.probeFailed { throw BridgeFailure.nativeDependency }
         catch { throw BridgeFailure.version }
     }
@@ -180,13 +187,15 @@ enum BridgeRuntime {
               ticket.expected.uid == getuid(), ticket.expected.pid == getppid(),
               ticket.terminal.guid != nil, ticket.dataRoot.standardizedFileURL.path != LocalStore.defaultRoot.standardizedFileURL.path else { throw RouterError.unverifiedOrigin }
         defer { cleanup(directory) }
-        guard ticket.nativeClientVersion == BridgeCompatibility.nativeClientVersion else { throw BridgeFailure.version }
+        guard BridgeCompatibility.supportedVersions.contains(ticket.nativeClientVersion) else { throw BridgeFailure.version }
         let native = ticket.nativeExecutable ?? nativeCodex
         try validateNativeExecutable(native)
         signal(SIGPIPE, SIG_IGN); signal(SIGTERM, stopBridge); signal(SIGINT, stopBridge); signal(SIGHUP, stopBridge)
         let store = try LocalStore(root: ticket.dataRoot)
+        let writerLease = try store.lockBridgeWriter()
+        defer { try? writerLease.close() }
         try LocalStore.requireSeparate(ticket.dataRoot)
-        var listener = socket(AF_UNIX, SOCK_STREAM, 0)
+        let listener = socket(AF_UNIX, SOCK_STREAM, 0)
         guard listener >= 0 else { throw RouterError.commandFailed }; defer { if listener >= 0 { close(listener) } }
         guard fcntl(listener, F_SETFD, FD_CLOEXEC) == 0 else { throw RouterError.commandFailed }
         var address = sockaddr_un(); address.sun_family = sa_family_t(AF_UNIX)
@@ -200,54 +209,61 @@ enum BridgeRuntime {
         }
         guard bound == 0, chmod(socketPath, 0o600) == 0, listen(listener, 1) == 0 else { throw RouterError.commandFailed }
         try writePrivate(Data("ready\n".utf8), to: directory.appendingPathComponent("ready"))
-        let connectionLimit = ticket.startupPicker == true ? 2 : 1
-        for connectionIndex in 1...connectionLimit {
-            var client: Int32 = -1
-            // The native TUI can show an update prompt before opening its socket.
-            // Allow time for a human to review it; peer PID/UID checks and the
-            // launcher's process-lifetime check below remain mandatory throughout.
-            let deadline = Date().addingTimeInterval(connectionIndex == 1 ? 10 * 60 : 30)
-            while Date() < deadline && bridgeTerminated == 0 {
-                guard ProcessOriginProbe.snapshot(ticket.expected.pid)?.startMicroseconds == ticket.expected.startMicroseconds else { throw RouterError.unverifiedOrigin }
-                var pollFD = pollfd(fd: listener, events: Int16(POLLIN), revents: 0)
-                if poll(&pollFD, 1, 100) <= 0 { continue }
-                let candidate = accept(listener, nil, nil)
-                guard candidate >= 0 else { continue }
-                var uid: uid_t = 0, gid: gid_t = 0, peer: pid_t = 0
-                var size = socklen_t(MemoryLayout<pid_t>.size)
-                if getpeereid(candidate, &uid, &gid) == 0 && uid == getuid(),
-                   getsockopt(candidate, SOL_LOCAL, LOCAL_PEERPID, &peer, &size) == 0,
-                   peer == ticket.expected.pid { client = candidate; break }
-                close(candidate)
-            }
-            guard client >= 0 else { throw BridgeFailure.startup }; defer { close(client) }
-            if connectionIndex == connectionLimit {
-                close(listener); listener = -1 // No further connection is admitted.
-            }
-            guard fcntl(client, F_SETFD, FD_CLOEXEC) == 0 else { throw RouterError.commandFailed }
-            guard let live = ProcessOriginProbe.snapshot(ticket.expected.pid), live.startMicroseconds == ticket.expected.startMicroseconds,
-                  live.terminalDevice == ticket.expected.terminalDevice, live.isDirectForegroundCandidate else { throw RouterError.unverifiedOrigin }
-            let (sessions, devices) = try inventory()
-            let origin = VerifiedTerminalOrigin(terminal: ticket.terminal, process: live)
-            _ = try ProcessOriginVerifier.revalidate(origin, live: live, sessions: sessions, devices: devices, currentUID: getuid())
-            let connectionID = connectionIndex == 1 ? ticket.connectionID : UUID().uuidString
-            guard try runConnection(client, origin: origin, ticket: ticket, store: store,
-                                    connectionID: connectionID, connectionIndex: connectionIndex,
-                                    listenerClosed: listener < 0) else { return }
-        }
+        let statusURL = ticket.dataRoot.appendingPathComponent("bridge-worker-" + ticket.connectionID + ".json")
+        var recoveryTurns: [String: String] = [:]
+        try BridgeConnectionServer.run(listener: listener, expected: ticket.expected,
+            shouldStop: { bridgeTerminated != 0 }, revalidate: {
+                guard let live = ProcessOriginProbe.snapshot(ticket.expected.pid),
+                      live.startMicroseconds == ticket.expected.startMicroseconds,
+                      live.terminalDevice == ticket.expected.terminalDevice,
+                      live.isDirectForegroundCandidate else { throw RouterError.unverifiedOrigin }
+                let (sessions, devices) = try inventory()
+                let origin = VerifiedTerminalOrigin(terminal: ticket.terminal, process: live)
+                _ = try ProcessOriginVerifier.revalidate(origin, live: live, sessions: sessions, devices: devices, currentUID: getuid())
+                guard try requireReviewedNativeExecutable(native) == ticket.nativeClientVersion else { throw BridgeFailure.version }
+                return origin
+            }, handle: { client, origin, index in
+                let connectionID = index == 1 ? ticket.connectionID : UUID().uuidString
+                return try runConnection(client, origin: origin, ticket: ticket, store: store,
+                                         connectionID: connectionID, connectionIndex: index, recoveryTurns: &recoveryTurns)
+            }, progress: { progress in
+                let value: [String: Any] = ["schema": 1, "status": progress.status,
+                    "updated_at": ISO8601DateFormatter().string(from: Date()),
+                    "native_client_version": ticket.nativeClientVersion,
+                    "accepted_connections": progress.acceptedConnections,
+                    "recovery_attempts": progress.recoveryAttempts,
+                    "recovery_limit": BridgeReconnectPolicy.maximumAttempts,
+                    "reason": progress.reason as Any? ?? NSNull(),
+                    "raw_protocol_persisted": false, "decisions_generated": false]
+                try? writePrivate(JSONSerialization.data(withJSONObject: value, options: [.sortedKeys]), to: statusURL)
+            })
     }
+    typealias ConnectionResult = BridgeConnectionServer.Result
     /// One connection owns its proxy, observer, taps and fresh binding. All are
-    /// retired before the worker can authenticate the optional second peer.
+    /// retired before the worker can authenticate a replacement peer.
     static func runConnection(_ client: Int32, origin: VerifiedTerminalOrigin, ticket: Ticket,
                               store: LocalStore, connectionID: String, connectionIndex: Int,
-                              listenerClosed: Bool) throws -> Bool {
+                              recoveryTurns: inout [String: String]) throws -> ConnectionResult {
         let workerBuildUUID = MachOBuildIdentity.loadedUUID()
-        var observer = CodexProtocolObserver(binding: .init(id: connectionID, origin: origin), project: ticket.project, workerBuildUUID: workerBuildUUID)
+        var observer = CodexProtocolObserver(binding: .init(id: connectionID, origin: origin), project: ticket.project,
+            workerBuildUUID: workerBuildUUID, nativeClientVersion: ticket.nativeClientVersion, recoveryTurns: recoveryTurns)
+        defer { recoveryTurns = observer.recoveryTurns }
         var clientTap = WebSocketTap(masked: true), serverTap = WebSocketTap(masked: false)
         let upstream = Process(), input = Pipe(), outputPipe = Pipe()
         upstream.executableURL = URL(fileURLWithPath: ticket.nativeExecutable ?? nativeCodex); upstream.arguments = ["app-server", "proxy"]
+        upstream.environment = CodexInstallation(nativeExecutable: ticket.nativeExecutable ?? nativeCodex)
+            .environment(inheriting: ProcessInfo.processInfo.environment)
         upstream.standardInput = input; upstream.standardOutput = outputPipe; upstream.standardError = FileHandle.nullDevice
-        try upstream.run()
+        do { try upstream.run() }
+        catch {
+            let result: [String: Any] = ["bridge_connection": connectionID, "status": "transport-failed",
+                "ended_by": "proxy-launch-failed", "accepted_connections": connectionIndex,
+                "recorded_at": ISO8601DateFormatter().string(from: Date()),
+                "raw_protocol_persisted": false, "decisions_generated": false]
+            try? writePrivate(JSONSerialization.data(withJSONObject: result, options: [.sortedKeys]),
+                              to: ticket.dataRoot.appendingPathComponent("bridge-" + connectionID + ".json"))
+            return ConnectionResult(duration: 0, endReason: "proxy-launch-failed", startupHandoff: false)
+        }
         defer { stopChild(upstream); try? input.fileHandleForWriting.close(); try? outputPipe.fileHandleForReading.close() }
         var observationFailed = false
         var reportedGaps = 0
@@ -255,18 +271,27 @@ enum BridgeRuntime {
         func emit(_ events: [AgentEvent]) {
             for event in events { do { try store.enqueue(event); eventCount += 1 } catch { observationFailed = true } }
         }
-        defer { emit(observer.disconnect()) }
+        defer {
+            let now = Date()
+            let deadline = bridgeTerminated == 0 ? now.addingTimeInterval(BridgeReconnectPolicy.recoveryWindow) : nil
+            emit(observer.disconnect(now: now, recoveringUntil: deadline))
+        }
         let started = Date()
         var completedNormally = false
         var handoffEligible = false
+        var endReason = "unknown"
         func receipt(_ status: String) {
             let result: [String: Any] = ["bridge_connection": connectionID, "status": status,
                 "worker_build_uuid": workerBuildUUID as Any? ?? NSNull(),
                 "native_client_version": ticket.nativeClientVersion,
                 "accepted_connections": connectionIndex,
-                "connection_limit": ticket.startupPicker == true ? 2 : 1,
-                "listener_closed_after_first_peer": ticket.startupPicker != true,
-                "listener_closed_on_accept": listenerClosed, "startup_handoff_eligible": handoffEligible,
+                "runtime_reconnect_limit": BridgeReconnectPolicy.maximumAttempts,
+                "listener_closed_on_accept": false, "startup_handoff_eligible": handoffEligible,
+                "ended_by": endReason,
+                "recorded_at": ISO8601DateFormatter().string(from: Date()),
+                "proxy_running_at_record": upstream.isRunning,
+                "proxy_exit_code": upstream.isRunning ? NSNull() : NSNumber(value: upstream.terminationStatus),
+                "proxy_exit_reason": upstream.isRunning ? "not-exited" : (upstream.terminationReason == .exit ? "exit" : "signal"),
                 "observed_picker_metadata_requests": observer.pickerMetadataRequestCount,
                 "interaction_coverage_notices": observer.coverageNoticeCount,
                 "duration_seconds": Date().timeIntervalSince(started), "events_observed": eventCount,
@@ -282,7 +307,8 @@ enum BridgeRuntime {
         receipt("connected")
         defer { receipt(completedNormally ? "disconnected" : "transport-failed") }
         var lastProbe = Date.distantPast
-        let end = try BridgeRelay.run(clientRead: client, clientWrite: client,
+        let end: BridgeRelay.EndReason
+        do { end = try BridgeRelay.run(clientRead: client, clientWrite: client,
             upstreamRead: outputPipe.fileHandleForReading.fileDescriptor, upstreamWrite: input.fileHandleForWriting.fileDescriptor,
             shouldStop: {
                 // Read pipe EOF even after the proxy exits, so the relay can
@@ -317,12 +343,21 @@ enum BridgeRuntime {
                     }
                 }
             })
+        } catch {
+            endReason = "relay-io-failed"
+            return ConnectionResult(duration: Date().timeIntervalSince(started), endReason: endReason, startupHandoff: false)
+        }
+        switch end {
+        case .clientClosed: endReason = "client-closed"
+        case .upstreamClosed: endReason = "upstream-closed"
+        case .stopped: endReason = "stopped"
+        }
         completedNormally = true
         handoffEligible = bridgeTerminated == 0 && BridgeStartupHandoff.permits(
             pickerLaunch: ticket.startupPicker == true, connectionIndex: connectionIndex,
             end: end, observerHealthy: !observationFailed && reportedGaps == 0,
             eventCount: eventCount, hasThreadSessionRequest: observer.hasThreadSessionRequest)
-        return handoffEligible
+        return ConnectionResult(duration: Date().timeIntervalSince(started), endReason: endReason, startupHandoff: handoffEligible)
     }
 }
 
@@ -330,8 +365,8 @@ enum BridgeFailure: LocalizedError {
     case usage, version, startup, nativeDependency
     var errorDescription: String? {
         switch self {
-        case .usage: "Isolated POC: aar codex --data-dir /private/test-directory [--native-codex /absolute/path/codex] -- [--no-alt-screen] [resume [SESSION_UUID]]. Resume opens the native picker when no UUID is given. Other Codex arguments are not enabled."
-        case .version: "This development bridge requires the reviewed native Codex \(BridgeCompatibility.nativeClientVersion) installation. Other versions are not enabled."
+        case .usage: "Usage: aar codex --data-dir /absolute/profile [--native-codex /absolute/path/codex] -- [--no-alt-screen] [resume [SESSION_UUID]]. Resume opens the native picker when no UUID is given. Other Codex arguments are not enabled."
+        case .version: "Supported native Codex versions: \(BridgeCompatibility.supportedDescription). Recheck the selected installation; a running TUI and its proxy must use the same version."
         case .nativeDependency: "The native Codex version check failed or exceeded 30 seconds. Check the installed native executable or the explicit --native-codex path. No terminal focus was attempted."
         case .startup: "The private bridge could not establish its verified local connection. Ordinary Codex remains available."
         }

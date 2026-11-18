@@ -52,6 +52,7 @@ struct DashboardView: View {
                     .font(.system(size: 9, weight: .medium)).foregroundStyle(.secondary).padding(.horizontal, 22).padding(.vertical, 8)
             }
             if let notice = model.routingNotice { banner(notice, icon: "link", color: Design.amber) }
+            if let notice = model.connectionRecoveryNotice { banner(notice, icon: "arrow.clockwise", color: Design.amber) }
             if model.paused { banner("Notifications paused. Your attention list stays up to date.", icon: "bell.slash", color: Design.blue) }
             if let message = model.message {
                 VStack(alignment: .leading, spacing: 7) {
@@ -80,8 +81,8 @@ struct DashboardView: View {
             }
             Rectangle().fill(Design.line).frame(height: 1)
             HStack(spacing: 6) {
-                Circle().fill(model.demo ? Design.blue : model.storage == nil || !model.threadVisibility.unavailableProcessIDs.isEmpty ? Design.amber : Design.green).frame(width: 5, height: 5)
-                Text(model.demo ? "Local-first. Always." : model.storage == nil ? "Connection needs setup" : !model.threadVisibility.unavailableProcessIDs.isEmpty ? "Terminal checks incomplete" : "Listening locally").font(.system(size: 10)).foregroundStyle(.secondary)
+                Circle().fill(model.demo ? Design.blue : model.storage == nil || model.connectionRecoveryNotice != nil || !model.threadVisibility.unavailableProcessIDs.isEmpty ? Design.amber : Design.green).frame(width: 5, height: 5)
+                Text(model.demo ? "Local-first. Always." : model.storage == nil ? "Connection needs setup" : model.connectionRecoveryNotice != nil ? "Connection interrupted" : !model.threadVisibility.unavailableProcessIDs.isEmpty ? "Terminal checks incomplete" : "Listening locally").font(.system(size: 10)).foregroundStyle(.secondary)
                 Spacer()
                 IconButton(icon: "waveform.path.ecg", label: "Diagnostics", action: openDiagnostics)
                 IconButton(icon: "gearshape", label: "Settings", action: openSettings)

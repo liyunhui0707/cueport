@@ -16,6 +16,6 @@ jobs:
       - name: Local app bundle
         run: zsh scripts/build.sh release
       - name: Bundle integrity
-        run: codesign --verify --deep --strict './build/Agent Attention Router.app'
+        run: codesign --verify --deep --strict './build/artifacts.noindex/Agent Attention Router.app'
       # Real Codex, notifications and Spaces tests need a logged-in interactive Mac.
       # This workflow does not publish, tag, upload artifacts or mutate a repository.

@@ -11,11 +11,20 @@ let action = arguments.dropFirst().first ?? "help"
 let root = option("--data-dir").map { URL(fileURLWithPath: $0, isDirectory: true) } ?? LocalStore.defaultRoot
 do {
     switch action {
+    case "inspect-bridge-migration":
+        guard option("--data-dir") != nil else { throw RouterError.invalidEvent }
+        let report = try BridgeMigration.inspect(root)
+        let data = try JSONSerialization.data(withJSONObject: report, options: [.sortedKeys])
+        print(String(decoding: data, as: UTF8.self))
+    case "remember-bridge-startup":
+        guard option("--data-dir") != nil else { throw RouterError.invalidEvent }
+        try BridgeMigration.remember(root, apply: arguments.contains("--apply"))
     case "check-bridge-dependencies":
         let executable = option("--native-codex") ?? BridgeRuntime.nativeCodex
-        try BridgeRuntime.requireReviewedNativeExecutable(executable)
+        let version = try BridgeRuntime.requireReviewedNativeExecutable(executable)
         guard FileManager.default.isExecutableFile(atPath: BridgeRuntime.iterm) else { throw RouterError.commandFailed }
-        print("Native arm64 Codex \(BridgeCompatibility.nativeClientVersion) and iTerm utility found. API permission and real terminal return are not checked.")
+        print("Native arm64 Codex \(version) and iTerm utility found. API permission and real terminal return are not checked.")
+        print(CodexInstallation(nativeExecutable: executable).updateSummary)
     case "codex":
         try BridgeRuntime.launch(Array(arguments.dropFirst(2)))
     case "bridge-worker":
@@ -103,7 +112,7 @@ do {
         aar doctor                       Print content-free environment diagnostics
         aar check-bridge-dependencies    Check exact native dependency version; no session/model task
         aar status                       Read the persisted state
-        aar codex --data-dir PATH --     Isolated native-TUI bridge (Codex \(BridgeCompatibility.nativeClientVersion) only)
+        aar codex --data-dir PATH --     Connected native TUI (Codex \(BridgeCompatibility.supportedDescription))
         aar codex --data-dir PATH -- resume [SESSION_UUID]
                                          Native restore picker or an explicit conversation
           --native-codex /path/codex       Optional native arm64 dependency before --; same exact version required

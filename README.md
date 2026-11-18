@@ -29,8 +29,11 @@ screenshot of accepted live monitoring.
   ambiguous target fails visibly without selecting another pane.
 - Remembers the connected bridge for ordinary app reopens. Settings includes
   separate commands for new conversations and native conversation restoration.
-- Lets you choose the native Codex file and run a bounded version check.
+- Shows the app version/path, offers an optional independent Dock icon, and lets
+  you choose the native Codex file with bounded version/update-source checks.
   Diagnostics distinguishes notification submission from verified return timing.
+- Keeps a bounded runtime reconnect listener for the same original live TUI;
+  every replacement connection revalidates its exact identity, with no task replay.
 - Preserves sessions and running workers during an application update; an
   optional reviewed installer retains the previous application for rollback.
 
@@ -38,13 +41,17 @@ The app does not answer questions, grant approvals or send terminal input.
 Reviewed, answered, cancelled and unknown remain different states. Some Codex
 interaction lifecycles are unconfirmed; the app keeps that uncertainty visible.
 
+Current alpha.3 native acceptance is partial: five accurate notification returns,
+one safe verification refusal, Air notification and Dock visual checks incomplete.
+Long-duration observations are still running. [Exact evidence and limits](docs/quality.md).
+
 ## Requirements
 
 | Component | Current scope |
 | --- | --- |
 | Mac | Apple Silicon; tested on macOS 27.2.1 |
 | iTerm2 | 3.7.7 at `/Applications/iTerm.app`; normal Python API permission required |
-| Codex | Native arm64 **0.169.0**, separately installed and initialized |
+| Codex | Native arm64 **0.169.0 / 0.170.0**, separately installed and initialized |
 | Native backend | A working official Codex backend and normal login/network prerequisites |
 | App signing | Local ad-hoc signature; no Developer ID or notarization |
 
@@ -96,7 +103,7 @@ zsh scripts/test.sh
 zsh scripts/build.sh release
 ```
 
-The app is built under `build/Agent Attention Router.app`. Build/test commands
+The app is built under `build/artifacts.noindex/Agent Attention Router.app`. Build/test commands
 neither install Hooks nor change your Codex configuration. Native GUI, permission,
 notification and Spaces acceptance require a logged-in Mac and remain separate
 from automated tests. [Acceptance scope](docs/compatibility.md).

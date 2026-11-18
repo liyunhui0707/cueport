@@ -1,45 +1,32 @@
 # Compatibility and acceptance
 
-This is an experimental connected-workflow preview, not complete P0 support
-for ordinary unwrapped Codex CLI sessions. Source deployment target macOS 14
-is not evidence that older macOS releases or Intel have been accepted.
+Alpha.3 is an experimental explicit connected launch/resume release. Ordinary
+unwrapped Codex is not automatically attached. Its release scope was explicitly
+accepted with incomplete native checks; a waiver never changes a failure into
+Pass. See [current evidence](quality.md) and [historical alpha.2 evidence](quality-alpha2.md).
 
-## Tested scope
-
-| Area | Evidence and boundary |
+| Area | Scope |
 | --- | --- |
-| Platform | Apple Silicon; two Macs on macOS 27.2.1, iTerm2 3.7.7; native Codex 0.169.0 only |
-| Automated state/helper checks | 172 Swift tests and 11 isolated executable checks on the development host; no raw conversation content |
-| Package maintenance | Actual signed app install, update, app-only rollback, failure restoration and safe refusal checks |
-| Startup/filtering | Saved bridge startup, duplicate receiver refusal, process exit/hangup filtering with unresolved records preserved |
-| Native return | Owner-confirmed registered-source Spaces/window/tab/split/full-screen/multiple-display cases on the primary host; these do not establish ordinary CLI origin |
-| Second Mac | Owner-confirmed real automatic visible notification and exact original terminal return, after Do Not Disturb was disabled; exact source/readback audit agreed |
-| Second-Mac cleanup | Test Codex exited, bindings disconnected and list emptied; owned test receiver and bounded QA backend stopped |
-| Pictures | Clearly labeled native sample renders only |
+| Platform | Apple Silicon; development and Air machines on macOS27.2.1/iTerm2 3.7.7. Other versions/Intel are unqualified. |
+| Native dependency | Exact arm64 0.169.0 / 0.170.0 accepted by the helper; both empty-home protocol checks passed on both Macs. Native TUI coverage remains partial. |
+| Backend | A separately initialized, complete official Codex backend with normal account/network prerequisites; single-binary downloads do not supply it. |
+| Recovery | Eight authenticated replacement attempts within120s per incident, stable60s resets budget, no task/approval replay. Peer, process birth, foreground TTY and exact unique terminal remain mandatory. |
+| Local notifications | Five new accurate returns; one retained focus-verification refusal; thirty-success target not completed. |
+| Air notifications | Current-candidate native check incomplete after missing-backend repair. Historical alpha.1/alpha.2 checks are not current acceptance. |
+| Resource gate | Current empty receiver:121samples/600.035s, peak74.094MiB, CPU0.045%;12-hour observations still running. |
+| Native UI | Settings/version/update-source labels and Dock switch state checked; visible Dock/reopen and full current-release accessibility/Spaces matrices incomplete. |
+| Data/tools | Synthetic stopped-profile migration and recoverable unused-build cleanup checks pass; never overwrite a live/newer profile or restore stale data with app rollback. |
+| Signing | Ad-hoc only; no Developer ID/notarization or automatic app updater. |
 
-The second-Mac QA dependency and its temporary backend are not bundled product
-services. Account and native permission steps were owner performed. Ordinary
-Codex/backend installation remains a separate prerequisite.
+Missing, conflicting, stale, changed or closed origins fail visibly without title,
+project, active-pane or input fallback. A safe refusal remains a failed return.
+Execution and outstanding requests remain independent; queue delivery, review,
+actual answer/cancellation and unknown are different states. Some native
+question/approval resolution remains unconfirmed. A turn-stop reminder does
+not prove final task completion; Focus and other OS policies can suppress alerts.
 
-## Known limitations
-
-- Ordinary unwrapped CLI source identity is unresolved. Hooks alone cannot enable
-  exact return using an inherited-but-unverified terminal GUID.
-- Some ordinary-chat question/approval lifecycle transitions remain unknown.
-  Queue acceptance, review and actual resolution are separate. Early permission
-  activity does not prove a human is waiting.
-- A turn-stop observation does not prove final task completion.
-- System Focus, permissions and display-sharing policy affect visible alerts.
-- Full keyboard/VoiceOver/long-name/contrast/reduced-motion and sustained workload
-  acceptance are incomplete. No production-support SLA or universal platform claim.
-- Snapshot retention/migration and broad long-duration capacity gates remain open;
-  no automatic history-deletion policy has been enabled.
-- Ten-minute empty-receiver measurement on an earlier bounded-read build had
-  mean/max RSS 76.77/82.58 MiB and CPU 0.545%. The original all-sampled RSS below
-  80 MiB target failed. Current-candidate measurement is reported separately,
-  without deleting that failure or changing sampling rules.
-- Ad-hoc signature only, no Developer ID/notarization, no automatic updater.
-
-Tests, OS submission acceptance and synthetic events do not prove visible UI,
-real-agent lifecycle semantics or complete ordinary-CLI support. No old failure
-is promoted to Pass merely because a later scoped check succeeds.
+macOS14 is a deployment target rather than a tested support claim. No production
+SLA, universal native lifecycle or whole-product P0 guarantee is made. Stored
+metadata is local; no prompts/code/tool commands/question bodies or transcript
+paths are persisted. No telemetry, automatic approvals or terminal input writer
+is implemented.

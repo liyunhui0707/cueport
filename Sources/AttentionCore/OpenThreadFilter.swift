@@ -16,7 +16,7 @@ public struct OpenThreadFilter: Sendable {
     public init(state: RouterState, processes: [Int32: RegisteredProcessStatus], currentUID: UInt32) {
         var visible = Set<String>(), unavailable = Set<Int32>()
         for session in state.sessions.values {
-            for entry in (session.protocolBindings ?? [:]).values where entry.connected {
+            for entry in (session.protocolBindings ?? [:]).values where entry.connected || entry.recoveryDeadline != nil {
                 guard (try? entry.binding.validate()) != nil else { continue }
                 let expected = entry.binding.origin.process
                 switch processes[expected.pid] ?? .unavailable {

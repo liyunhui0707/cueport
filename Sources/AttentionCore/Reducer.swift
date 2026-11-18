@@ -36,10 +36,23 @@ public struct RouterState: Codable, Equatable, Sendable {
                 let conflictingBuilds = previous?.workerBuildConflict == true ||
                     (previous?.workerBuildUUID != nil && event.workerBuildUUID != nil && previous?.workerBuildUUID != event.workerBuildUUID)
                 session.protocolBindings = session.protocolBindings ?? [:]
-                session.protocolBindings?[binding.id] = .init(binding: binding,
+                var entry = ProtocolBindingState(binding: binding,
                     connected: event.kind != .sourceLost, updatedAt: event.timestamp,
                     workerBuildUUID: previous?.workerBuildUUID ?? event.workerBuildUUID,
                     workerBuildConflict: conflictingBuilds ? true : nil)
+                entry.recoveryDeadline = event.kind == .sourceLost ? event.transportRecoveryDeadline : nil
+                entry.nativeClientVersion = previous?.nativeClientVersion ?? event.nativeClientVersion
+                session.protocolBindings?[binding.id] = entry
+                if event.kind == .sessionStarted {
+                    // Retire the recovery presentation of older transports from
+                    // this same verified TUI. Their routing tombstones remain.
+                    for id in Array(session.protocolBindings?.keys ?? Dictionary<String, ProtocolBindingState>().keys) where id != binding.id {
+                        guard var old = session.protocolBindings?[id], !old.connected,
+                              old.binding.origin.process.instanceID == binding.origin.process.instanceID,
+                              old.binding.origin.terminal.guid == binding.origin.terminal.guid else { continue }
+                        old.recoveryDeadline = nil; session.protocolBindings?[id] = old
+                    }
+                }
             }
             if let verified = session.verifiedProtocolBinding {
                 session.terminal = verified.origin.terminal

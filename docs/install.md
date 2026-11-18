@@ -9,7 +9,7 @@ backend services are not bundled. Review [compatibility](compatibility.md).
 Download the exact selected release app archive and `SHA256SUMS` from the [Releases](https://github.com/liyunhui0707/agent-attention-router/releases). Verify the archive against that release's digest:
 
 ```sh
-shasum -a 256 AgentAttentionRouter-0.1.0-alpha.2-macos-arm64.zip
+shasum -a 256 AgentAttentionRouter-0.1.0-alpha.3-macos-arm64.zip
 ```
 
 Compare its complete result with the published checksum. A checksum establishes
@@ -28,8 +28,11 @@ Python 3 is needed only for the optional reviewed installer below.
 ## External prerequisites
 
 - Apple Silicon Mac, tested macOS 27.2.1; iTerm2 3.7.7 at `/Applications/iTerm.app`.
-- Native arm64 Codex **0.169.0**, normally initialized and able to run through its
+- Native arm64 Codex **0.169.0 or 0.170.0**, normally initialized and able to run through its
   own working backend/account/network setup. Other versions and wrappers fail.
+  A single native executable is not a complete managed-backend installation.
+  If the official backend socket is absent, install/initialize a complete official
+  Codex package separately; repeated connected launches cannot repair it.
 - The default native file is expected at
   `/opt/homebrew/lib/node_modules/@openai/codex/node_modules/@openai/codex-darwin-arm64/vendor/aarch64-apple-darwin/bin/codex`.
   The app does not install or upgrade this dependency for you. Official version assets are available from [OpenAI’s 0.169.0 release](https://github.com/openai/codex/releases/tag/rust-v0.169.0); a manually selected native file still needs normal Codex/backend setup.
@@ -45,7 +48,7 @@ Check the file/version and iTerm utility without starting a conversation:
 
 For an explicitly selected native file, add `--native-codex /absolute/path/codex`
 to that check, or before the `--` separator in a copied helper launch command.
-It must still be a native arm64 file of the exact version. Settings also offers
+It must still be a native arm64 file of a reviewed exact version. Settings also offers
 **Choose native file…** and **Check file/version**; a successfully checked choice
 is used by future copied commands. A path supplied only to one CLI command does
 not change the saved Settings choice or existing clients.
@@ -95,9 +98,42 @@ Existing workers keep their mapped helper through an update. Reconnect naturally
 when their work is idle to load a changed helper. The receiver's Diagnostics
 compares loaded and on-disk builds; an update is not a worker restart.
 
-A remembered custom data folder stays in place, including an older development
-folder inside a checkout. Do not delete it or its containing checkout until a
-separately planned migration. A new installation uses Application Support.
+A remembered custom data folder stays in place. For an old development folder,
+first finish and exit all its connected Codex clients, quit its receiver, then
+review a stopped-profile migration:
+
+```sh
+python3 manage_bridge_data.py --source /absolute/old-profile --destination /absolute/new-profile --helper './Agent Attention Router.app/Contents/MacOS/aar'
+```
+
+Only apply after the native preflight reports zero clients/workers/unknown
+tickets, using `--apply --expected-fingerprint` with that exact reviewed value.
+The tool requires a new destination, retains all original data, verifies the
+copy, remembers the new location and marks the old profile as relocated.
+It never overwrites a newer profile or restores an old snapshot. Keep the receipt
+and original folder. A failed activation leaves copies for explicit review.
+A new installation uses Application Support.
+
+## Update source and connection recovery
+
+The selected global npm installation carries the official npm update context;
+a real Homebrew cask uses Homebrew. An independently downloaded native file
+uses manual update guidance and hides the package-manager update popup only for
+that connected invocation. No global Codex config is changed. Recheck the selected
+native path/version after changing a dependency; existing clients retain theirs.
+
+A transient transport loss keeps the listener for the same live TUI and admits
+only freshly authenticated replacements. Retries are bounded to eight attempts
+within 120 seconds per incident; a stable connection resets the budget. The app
+never resubmits a task, answer or approval. Missing/changed/closed identity fails
+visibly. Pending requests remain unconfirmed until real evidence arrives again.
+A matching previously observed active turn may be recovered from explicit native
+resume metadata; its timestamp is observation time, not model completion time.
+
+If recovery fails, save any draft, exit that native client yourself, and use
+**Copy resume command** from the installed app in your project directory. Old
+temporary socket commands can be obsolete. Reopening the receiver alone cannot
+repair a missing official backend, login or model network connectivity.
 
 ## Rollback and recovery
 
@@ -117,7 +153,7 @@ an alternative when all mapped clients are closed and an old-app backup is kept.
 | Symptom | Check |
 | --- | --- |
 | No projects | Confirm Connected bridge and use the copied launcher/resume command; existing unwrapped clients are not auto-discovered. |
-| Dependency/version failure | Check the exact native path/0.169.0 version; do not substitute a shell or npm wrapper. |
+| Dependency/version failure | Check the exact native path and reviewed 0.169.0/0.170.0 version; do not substitute a shell or npm wrapper. |
 | WebSocket handshake/reconnect failure | Check normal Codex backend availability separately from model networking. |
 | No visible alert | Check app authorization, desktop alert style, Focus and display-sharing policies. A Notification Center record and OS submission acceptance are distinct from visible display. |
 | Cannot return | Keep the original pane/process open and review iTerm API permission. No title/project fallback is used. |

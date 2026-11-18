@@ -6,8 +6,15 @@ import AttentionCore
 @main
 struct AppMain {
     @MainActor static func main() {
-        let app = NSApplication.shared
+        let app = autoreleasepool { NSApplication.shared }
         app.setActivationPolicy(.accessory)
+        autoreleasepool {
+            let menu = NSMenu(), applicationItem = NSMenuItem(), applicationMenu = NSMenu()
+            let quit = NSMenuItem(title: "Quit Attention Router", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
+            quit.target = app; quit.keyEquivalentModifierMask = .command
+            applicationMenu.addItem(quit); applicationItem.submenu = applicationMenu
+            menu.addItem(applicationItem); app.mainMenu = menu
+        }
         if let index = CommandLine.arguments.firstIndex(of: "--render-previews"), CommandLine.arguments.count > index + 1 {
             PreviewRenderer.render(to: URL(fileURLWithPath: CommandLine.arguments[index + 1])); return
         }
@@ -30,7 +37,9 @@ struct AppMain {
             existing.activate(options: [.activateAllWindows])
             return
         }
-        let delegate = AppDelegate()
+        // Release temporary Foundation objects made before NSApplication's
+        // event-loop autorelease pools begin; the delegate itself stays owned.
+        let delegate = autoreleasepool { AppDelegate() }
         app.delegate = delegate
         withExtendedLifetime(delegate) { app.run() }
     }
@@ -38,19 +47,31 @@ struct AppMain {
 
 @MainActor final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDelegate {
     var statusItem: NSStatusItem!
-    let popover = NSPopover()
+    // Background monitoring does not need a view hierarchy. Create the panel
+    // on the first UI interaction rather than during every receiver startup.
+    lazy var popover: NSPopover = {
+        let value = NSPopover()
+        value.behavior = .transient
+        return value
+    }()
     var windows: [NSWindow] = []
     let model = RouterModel()
     private let review = Bundle.main.object(forInfoDictionaryKey: "AARBuildChannel") as? String == "review"
+    private let validationLabel = Bundle.main.object(forInfoDictionaryKey: "AARValidationBuild") as? Bool == true
     func applicationDidFinishLaunching(_ notification: Notification) {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
-        statusItem.button?.image = NSImage(systemSymbolName: "dot.radiowaves.left.and.right", accessibilityDescription: "Agent Attention Router")
+        // The packaged template preserves the system glyph without resolving
+        // its symbol/font machinery on every background receiver launch.
+        let indicator = NSImage(named: "AARStatusIndicator") ?? NSImage(systemSymbolName: "dot.radiowaves.left.and.right", accessibilityDescription: nil)
+        indicator?.isTemplate = true
+        indicator?.accessibilityDescription = "Agent Attention Router"
+        statusItem.button?.image = indicator
         statusItem.button?.target = self; statusItem.button?.action = #selector(toggle)
-        statusItem.button?.toolTip = review ? "Attention Router — Test build (isolated data)" : "Attention Router — Daily application"
-        popover.behavior = .transient
+        statusItem.button?.toolTip = review || validationLabel ? "Attention Router — Test build (isolated data)" : "Attention Router — Daily application"
         model.onCountChanged = { [weak self] count in
             guard let self else { return }
-            self.statusItem.button?.title = (self.review ? " TEST" : "") + (count == 0 ? "" : " \(count)")
+            let title = (self.review || self.validationLabel ? " TEST" : "") + (count == 0 ? "" : " \(count)")
+            if self.statusItem.button?.title != title { self.statusItem.button?.title = title }
         }
         model.onNotify = { [weak self] event, session in
             if event.kind == .approvalRequested && event.protocolBinding != nil {
@@ -113,7 +134,7 @@ struct AppMain {
         visit(view)
         do {
             try LocalStore.ensurePrivateDirectory(model.root)
-            let result: [String: Any] = ["native_popover_shown": popover.isShown,
+            let result: [String: Any] = ["receiver_pid": getpid(), "native_popover_shown": popover.isShown,
                 "application_active": NSApp.isActive,
                 "sample_sessions": model.sessions.count, "feedback_inserted_after_open": model.message != nil,
                 "content_height": popover.contentSize.height, "hosting_height": view.bounds.height,
@@ -217,6 +238,7 @@ struct AppMain {
         completionHandler([.banner, .list, .sound])
     }
     nonisolated func userNotificationCenter(_ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse, withCompletionHandler completionHandler: @escaping () -> Void) {
+        let callbackStarted = DispatchTime.now().uptimeNanoseconds
         let id = response.notification.request.content.userInfo["sessionID"] as? String
         let instance = response.notification.request.content.userInfo["sourceInstance"] as? String
         let deliveryTest = response.notification.request.content.userInfo["deliveryTest"] as? Bool ?? false
@@ -228,7 +250,7 @@ struct AppMain {
             }
         } else if response.actionIdentifier == UNNotificationDefaultActionIdentifier, let id {
             Task { @MainActor in
-                await model.focusNotification(id, instance: instance)
+                await model.focusNotification(id, instance: instance, callbackStarted: callbackStarted)
                 // A closed/ambiguous target needs visible feedback even when
                 // no Settings window or menu panel was already open.
                 if model.message != nil && !popover.isShown { toggle() }

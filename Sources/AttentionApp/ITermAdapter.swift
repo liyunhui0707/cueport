@@ -6,8 +6,11 @@ enum ITermAdapter {
     enum Stage: String, Sendable { case inventory, reveal, verification }
     struct CommandFailure: LocalizedError, Sendable {
         let stage: Stage
+        var reason: BoundedProcess.Failure? = nil
         var errorDescription: String? {
-            switch stage {
+            if reason == .timeout { return "iTerm2’s \(stage.rawValue) check timed out. Review its API permission and retry. This return was not marked reviewed." }
+            if reason == .outputLimit { return "iTerm2’s response exceeded the safe size limit. Check Diagnostics; this return was not marked reviewed." }
+            return switch stage {
             case .inventory: "iTerm2 did not return its session inventory. Review its API access, then retry."
             case .reveal: "iTerm2 could not accept the original-session reveal request. Retry from the attention list."
             case .verification: "iTerm2 did not confirm the original Pane. This return was not marked reviewed."
@@ -50,19 +53,10 @@ enum ITermAdapter {
     private static func run(_ arguments: [String], stage: Stage, command: Command = .iterm) async throws -> Data {
         try await Task.detached(priority: .userInitiated) {
             guard FileManager.default.isExecutableFile(atPath: command.rawValue) else { throw RouterError.terminalUnavailable }
-            let process = Process(); process.executableURL = URL(fileURLWithPath: command.rawValue); process.arguments = arguments
-            let output = Pipe(); let errors = FileHandle.nullDevice
-            process.standardOutput = output; process.standardError = errors
-            process.standardInput = FileHandle.nullDevice
-            process.environment = ["PATH": "/usr/bin:/bin", "HOME": FileManager.default.homeDirectoryForCurrentUser.path, "LANG": "en_US.UTF-8"]
-            try process.run()
-            let deadline = DispatchWorkItem { if process.isRunning { process.terminate() } }
-            DispatchQueue.global().asyncAfter(deadline: .now() + 5, execute: deadline)
-            let data = output.fileHandleForReading.readDataToEndOfFile()
-            process.waitUntilExit(); deadline.cancel()
-            guard process.terminationStatus == 0 else { throw CommandFailure(stage: stage) }
-            guard data.count <= 1_048_576 else { throw RouterError.oversizedPayload }
-            return data
+            do {
+                return try BoundedProcess.output(URL(fileURLWithPath: command.rawValue), arguments: arguments,
+                    environment: ["PATH": "/usr/bin:/bin", "HOME": FileManager.default.homeDirectoryForCurrentUser.path, "LANG": "en_US.UTF-8"])
+            } catch let reason as BoundedProcess.Failure { throw CommandFailure(stage: stage, reason: reason) }
         }.value
     }
 }

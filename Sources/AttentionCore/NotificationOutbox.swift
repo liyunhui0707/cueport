@@ -97,6 +97,9 @@ public final class NotificationDelivery {
     private var accepted: [String: (NotificationPlan, Date)] = [:]
     private var lastSubmission: NotificationSubmissionObservation?
     private var lastSaveFailure: NotificationSaveFailure?
+    private var observationTimes: [String: Date] = [:]
+    private var acceptedLatencies: [Double] = []
+    private var excludedLatencyObservations = 0
     public init() {}
 
     public func health(in state: RouterState, now: Date) -> NotificationDeliveryHealth {
@@ -113,6 +116,8 @@ public final class NotificationDelivery {
         health.submitting = inFlight.count - accepted.count
         health.receiptsAwaitingSave = accepted.count
         health.lastSubmission = lastSubmission; health.lastSaveFailure = lastSaveFailure
+        health.acceptedEventLatency = .init(milliseconds: acceptedLatencies)
+        health.excludedLatencyObservations = excludedLatencyObservations
         return health
     }
 
@@ -138,13 +143,19 @@ public final class NotificationDelivery {
         // Persist a retry deadline before calling macOS. Restart cannot bypass it.
         do { try save(next) }
         catch { lastSaveFailure = .init(stage: .reservation, recordedAt: now); throw error }
-        state = next; inFlight[event.id] = plan
+        state = next; inFlight[event.id] = plan; observationTimes[event.id] = event.timestamp
         return plan
     }
     public func complete(_ plan: NotificationPlan, accepted: Bool, in state: inout RouterState,
                          now: Date, save: (RouterState) throws -> Void) throws {
         guard inFlight[plan.eventID] == plan, self.accepted[plan.eventID] == nil else { return }
-        lastSubmission = .init(outcome: accepted ? .accepted : .failed, recordedAt: now)
+        let elapsed = observationTimes.removeValue(forKey: plan.eventID).map { now.timeIntervalSince($0) * 1000 }
+        let validElapsed = elapsed.flatMap { $0.isFinite && $0 >= 0 ? $0 : nil }
+        lastSubmission = .init(outcome: accepted ? .accepted : .failed, recordedAt: now, eventToSubmissionMilliseconds: validElapsed)
+        if accepted {
+            if let validElapsed { acceptedLatencies = Array((acceptedLatencies + [validElapsed]).suffix(100)) }
+            else { excludedLatencyObservations += 1 }
+        }
         guard accepted else { inFlight[plan.eventID] = nil; return }
         self.accepted[plan.eventID] = (plan, now)
         try flush(in: &state, now: now, save: save)

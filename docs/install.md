@@ -6,10 +6,10 @@ backend services are not bundled. Review [compatibility](compatibility.md).
 
 ## Download and first open
 
-Download the exact selected release app archive and `SHA256SUMS` from the [selected release](https://github.com/liyunhui0707/agent-attention-router/releases/tag/v0.1.0-alpha.1). Verify the archive against that release's digest:
+Download the exact selected release app archive and `SHA256SUMS` from the [Releases](https://github.com/liyunhui0707/agent-attention-router/releases). Verify the archive against that release's digest:
 
 ```sh
-shasum -a 256 AgentAttentionRouter-0.1.0-alpha.1-macos-arm64.zip
+shasum -a 256 AgentAttentionRouter-0.1.0-alpha.2-macos-arm64.zip
 ```
 
 Compare its complete result with the published checksum. A checksum establishes
@@ -45,8 +45,10 @@ Check the file/version and iTerm utility without starting a conversation:
 
 For an explicitly selected native file, add `--native-codex /absolute/path/codex`
 to that check, or before the `--` separator in a copied helper launch command.
-It must still be a native arm64 file of the exact version. Settings copy buttons
-use the default path above; selecting a file in a command does not change them.
+It must still be a native arm64 file of the exact version. Settings also offers
+**Choose native file…** and **Check file/version**; a successfully checked choice
+is used by future copied commands. A path supplied only to one CLI command does
+not change the saved Settings choice or existing clients.
 
 This check does not verify backend readiness, login, connectivity or API
 permission. A fresh isolated `CODEX_HOME` without a backend can fail WebSocket

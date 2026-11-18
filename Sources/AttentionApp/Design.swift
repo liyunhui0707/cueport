@@ -46,8 +46,11 @@ struct IconButton: View {
     let label: String
     var action: () -> Void
     @State private var hovering = false
+    @FocusState private var keyboardFocused: Bool
     var body: some View {
-        Button(action: action) { Image(systemName: icon).font(.system(size: 13)).frame(width: 28, height: 28).background(.primary.opacity(hovering ? 0.07 : 0), in: RoundedRectangle(cornerRadius: 7)) }
+        Button(action: action) { Image(systemName: icon).font(.system(size: 13)).frame(width: 28, height: 28).background(.primary.opacity(hovering || keyboardFocused ? 0.07 : 0), in: RoundedRectangle(cornerRadius: 7)) }
             .buttonStyle(.plain).foregroundStyle(.secondary).help(label).accessibilityLabel(label).onHover { hovering = $0 }
+            .focused($keyboardFocused)
+            .overlay(RoundedRectangle(cornerRadius: 7).stroke(keyboardFocused ? Design.blue : .clear, lineWidth: 2))
     }
 }

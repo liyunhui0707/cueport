@@ -11,6 +11,12 @@ import AppKit
                 let model = RouterModel(demo: true)
                 let organized = RouterModel(demo: true)
                 organized.state = DemoData.organizedState()
+                let longNames = RouterModel(demo: true)
+                longNames.state = DemoData.organizedState()
+                for id in Array(longNames.state.sessions.keys) {
+                    longNames.state.sessions[id]?.project = "很长的项目名称 — Native accessibility and scroll validation — " + String(repeating: "sample-workspace-", count: 7)
+                }
+                try save(DashboardView(model: longNames, expandRecords: true).environment(\.colorScheme, dark ? .dark : .light), to: directory.appendingPathComponent("long-names-\(style).png"))
                 try save(DashboardView(model: organized).environment(\.colorScheme, dark ? .dark : .light), to: directory.appendingPathComponent("organized-\(style).png"))
                 try save(DashboardView(model: organized, expandRecords: true)
                     .environment(\.colorScheme, dark ? .dark : .light), to: directory.appendingPathComponent("organized-expanded-\(style).png"))
@@ -18,6 +24,8 @@ import AppKit
                 try save(UtilityView(model: model, settings: true).environment(\.colorScheme, dark ? .dark : .light), to: directory.appendingPathComponent("settings-\(style).png"))
                 try save(UtilityView(model: model, settings: true).startupContent.padding(28).frame(width: 540).background(Design.background)
                     .environment(\.colorScheme, dark ? .dark : .light), to: directory.appendingPathComponent("startup-\(style).png"))
+                try save(UtilityView(model: model, settings: true).nativeCodexContent.padding(28).frame(width: 540).background(Design.background)
+                    .environment(\.colorScheme, dark ? .dark : .light), to: directory.appendingPathComponent("native-dependency-\(style).png"))
                 try save(UtilityView(model: model, settings: false).environment(\.colorScheme, dark ? .dark : .light), to: directory.appendingPathComponent("diagnostics-\(style).png"))
                 let workers = RouterModel(demo: true)
                 workers.state = DemoData.workerBuildState()

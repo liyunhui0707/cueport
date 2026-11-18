@@ -127,7 +127,11 @@ public struct NotificationSubmissionObservation: Codable, Equatable, Sendable {
     public enum Outcome: String, Codable, Sendable { case accepted, failed }
     public let outcome: Outcome
     public let recordedAt: Date
-    public init(outcome: Outcome, recordedAt: Date) { self.outcome = outcome; self.recordedAt = recordedAt }
+    public let eventToSubmissionMilliseconds: Double?
+    public init(outcome: Outcome, recordedAt: Date, eventToSubmissionMilliseconds: Double? = nil) {
+        self.outcome = outcome; self.recordedAt = recordedAt
+        self.eventToSubmissionMilliseconds = eventToSubmissionMilliseconds.flatMap { $0.isFinite && $0 >= 0 ? $0 : nil }
+    }
 }
 
 public struct NotificationSaveFailure: Codable, Equatable, Sendable {
@@ -146,5 +150,8 @@ public struct NotificationDeliveryHealth: Codable, Equatable, Sendable {
     public var nextRetryAt: Date?
     public var lastSubmission: NotificationSubmissionObservation?
     public var lastSaveFailure: NotificationSaveFailure?
+    /// Receiver-local accepted submissions; not visible-banner latency.
+    public var acceptedEventLatency = LatencySummary(milliseconds: [])
+    public var excludedLatencyObservations = 0
     public init() {}
 }

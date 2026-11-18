@@ -60,8 +60,10 @@ public struct BridgeLaunchOptions: Equatable, Sendable {
         ["--remote", endpoint, "--cd", directory] + codexArguments
     }
 
-    public func shellCommand(executable: String, dataDirectory: String) -> String {
+    public func shellCommand(executable: String, dataDirectory: String, nativeExecutable: String? = nil) -> String {
         func quote(_ value: String) -> String { "'" + value.replacingOccurrences(of: "'", with: "'\\''") + "'" }
-        return ([quote(executable), "codex", "--data-dir", quote(dataDirectory), "--"] + codexArguments).joined(separator: " ")
+        var arguments = [quote(executable), "codex", "--data-dir", quote(dataDirectory)]
+        if let nativeExecutable { arguments += ["--native-codex", quote(nativeExecutable)] }
+        return (arguments + ["--"] + codexArguments).joined(separator: " ")
     }
 }

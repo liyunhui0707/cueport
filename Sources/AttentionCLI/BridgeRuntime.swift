@@ -8,7 +8,7 @@ private func stopBridge(_ signal: Int32) { bridgeTerminated = 1 }
 /// Development-only bridge for the source-reviewed installed version. No shell,
 /// PTY emulator, daemon restart, approval writer or model prompt is involved.
 enum BridgeRuntime {
-    static let nativeCodex = "/opt/homebrew/lib/node_modules/@openai/codex/node_modules/@openai/codex-darwin-arm64/vendor/aarch64-apple-darwin/bin/codex"
+    static let nativeCodex = NativeCodex.defaultPath
     static let iterm = "/Applications/iTerm.app/Contents/Resources/utilities/it2"
     struct Ticket: Codable {
         let schema: Int
@@ -164,23 +164,13 @@ enum BridgeRuntime {
         BridgeDirectoryPolicy.accepts(directory)
     }
     static func validateNativeExecutable(_ path: String) throws {
-        var info = stat()
-        guard stat(path, &info) == 0, info.st_mode & S_IFMT == S_IFREG,
-              FileManager.default.isExecutableFile(atPath: path),
-              URL(fileURLWithPath: path).lastPathComponent == "codex" else { throw BridgeFailure.version }
-        let handle = try FileHandle(forReadingFrom: URL(fileURLWithPath: path))
-        defer { try? handle.close() }
-        // Native arm64 Mach-O only. Do not exec an npm/JS/shell wrapper, which
-        // would invalidate the original foreground PID relationship.
-        guard let header = try handle.read(upToCount: 8),
-              Array(header) == [0xcf, 0xfa, 0xed, 0xfe, 0x0c, 0x00, 0x00, 0x01] else { throw BridgeFailure.version }
+        do { try NativeCodex.inspect(path) }
+        catch { throw BridgeFailure.version }
     }
     static func requireReviewedNativeExecutable(_ path: String) throws {
-        try validateNativeExecutable(path)
-        let version: Data
-        do { version = try output(path, ["--version"], timeout: 30) }
-        catch { throw BridgeFailure.nativeDependency }
-        guard BridgeCompatibility.acceptsNativeVersionOutput(version) else { throw BridgeFailure.version }
+        do { try NativeCodex.verifyVersion(path) }
+        catch NativeCodex.Failure.probeFailed { throw BridgeFailure.nativeDependency }
+        catch { throw BridgeFailure.version }
     }
     static func worker(_ file: URL) throws {
         let ticket = try JSONDecoder().decode(Ticket.self, from: readPrivate(file))

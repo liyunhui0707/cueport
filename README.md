@@ -11,7 +11,7 @@ or resume workflow below. Ordinary unwrapped Codex sessions are not automaticall
 attached. This is not complete P0/ordinary-CLI support.
 
 [中文](docs/README.zh-CN.md) · [Install and update](docs/install.md) ·
-[Compatibility and acceptance](docs/compatibility.md) · [Security](SECURITY.md)
+[Compatibility and acceptance](docs/compatibility.md) · [Quality evidence](docs/quality.md) · [Security](SECURITY.md) · [Third-party notices](THIRD_PARTY_NOTICES.md)
 
 ![Native grouped panel with synthetic sample sessions](docs/images/open-threads-dark.png)
 
@@ -29,6 +29,8 @@ screenshot of accepted live monitoring.
   ambiguous target fails visibly without selecting another pane.
 - Remembers the connected bridge for ordinary app reopens. Settings includes
   separate commands for new conversations and native conversation restoration.
+- Lets you choose the native Codex file and run a bounded version check.
+  Diagnostics distinguishes notification submission from verified return timing.
 - Preserves sessions and running workers during an application update; an
   optional reviewed installer retains the previous application for rollback.
 
@@ -52,7 +54,7 @@ Python, Node and accounts are not bundled.
 
 ## Install and connect
 
-Download [v0.1.0-alpha.1](https://github.com/liyunhui0707/agent-attention-router/releases/tag/v0.1.0-alpha.1), extract it and keep
+Download a published package from [Releases](https://github.com/liyunhui0707/agent-attention-router/releases), extract it and keep
 `Agent Attention Router.app` in `~/Applications`. See [installation](docs/install.md)
 for verification, macOS first-open handling and update/rollback instructions.
 
@@ -62,7 +64,10 @@ for verification, macOS first-open handling and update/rollback instructions.
 3. Use **Copy launch command** for a new conversation, or **Copy resume command**
    to choose an existing one. Run it in an iTerm2 Shell from your project folder.
    Complete native login/trust/API permission dialogs yourself.
-4. Enable app/system notifications. Focus and display-sharing policies may
+4. If the default native dependency is missing, use **Choose native file…** and
+   **Check file/version**. Select the arm64 binary named `codex`, rather than its
+   shell/npm wrapper. This check does not start or repair its backend/login.
+5. Enable app/system notifications. Focus and display-sharing policies may
    suppress alerts; the attention list remains available.
 
 Keep existing custom data folders: installing the app elsewhere does not migrate

@@ -14,3 +14,8 @@ app-only rollback. Prerelease channel status does not imply formal P0 acceptance
 The push/pull-request workflow runs source tests and builds only; it does not
 publish, tag, upload assets or modify the repository. Remote CI is evidence only
 after that exact source commit's run succeeds.
+
+The owner selected **0.1.0-alpha.2**, build **2**, for the next experimental
+prerelease after its required quality checks pass. Alpha.1 stays immutable.
+No automatic version increment, formal-channel promotion or notarization is
+authorized by this version selection.

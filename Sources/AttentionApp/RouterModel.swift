@@ -34,6 +34,18 @@ import Darwin
     private let startupSelection: StartupSelection
     @Published private(set) var savedStartup: BridgeStartupProfile?
     @Published private(set) var hasSavedStartup = false
+    @Published private(set) var chosenNativeCodex: String?
+    @Published private(set) var nativeChoiceUnavailable = false
+    @Published private(set) var checkingNativeCodex = false
+    @Published private(set) var nativeCodexStatus = "Not checked · Each launch verifies the native file and version"
+    @Published private var nativeCheckFailed = false
+    private var canSaveNativeChoice: Bool { !demo && !ReceiverLaunchPolicy.isExplicitRun(CommandLine.arguments) }
+    var nativeCodexPath: String? { nativeChoiceUnavailable ? nil : chosenNativeCodex ?? NativeCodex.defaultPath }
+    var canCopyNativeCommands: Bool { !nativeChoiceUnavailable && !checkingNativeCodex && !nativeCheckFailed }
+    var nativeChoiceScopeDescription: String {
+        canSaveNativeChoice ? "Saved choices apply to this app’s future normal launches." :
+            "This isolated run does not change your daily app’s native-file choice."
+    }
     var startupBlocked: Bool { startupSelection.mode == .blocked && !demo }
     var canRememberStartup: Bool { !demo && bridgePOC && monitoringHealth == .ready }
     var currentModeDescription: String {
@@ -52,7 +64,7 @@ import Darwin
     private var watcherGeneration = 0
     var maintenance: Timer?
     var terminalCheckTimer: Timer?
-    @Published private var registeredProcesses: [Int32: RegisteredProcessStatus] = [:]
+    private var registeredProcesses: [Int32: RegisteredProcessStatus] = [:]
     private var lastTerminalCheck = Date.distantPast
     var root: URL
     var sessions: [AgentSession] {
@@ -84,7 +96,15 @@ import Darwin
         guard !demo, force || Date().timeIntervalSince(lastTerminalCheck) >= 2 else { return }
         lastTerminalCheck = Date()
         let pids = Set(state.sessions.values.flatMap { ($0.protocolBindings ?? [:]).values.filter(\.connected).map(\.binding.origin.process.pid) })
-        registeredProcesses = pids.reduce(into: [:]) { $0[$1] = OpenThreadFilter.inspect($1) }
+        let previous = threadVisibility
+        let inspected = pids.reduce(into: [Int32: RegisteredProcessStatus]()) { $0[$1] = OpenThreadFilter.inspect($1) }
+        let next = OpenThreadFilter(state: state, processes: inspected, currentUID: getuid())
+        // Refresh kernel evidence on every poll. Only the presentation result
+        // needs to invalidate SwiftUI; probe timestamps alone do not change it.
+        if previous.visibleThreadIDs != next.visibleThreadIDs || previous.unavailableProcessIDs != next.unavailableProcessIDs {
+            objectWillChange.send()
+        }
+        registeredProcesses = inspected
         onCountChanged?(attentionCount)
     }
     func setArchived(_ id: String, archived: Bool) {
@@ -140,7 +160,58 @@ import Darwin
             do { originPOC = try OriginPOC.load(URL(fileURLWithPath: CommandLine.arguments[index + 1])) }
             catch { message = "The local routing test fixture could not be verified. Exact return remains paused." }
         }
+        if canSaveNativeChoice, let preference = UserDefaults.standard.object(forKey: NativeCodexPreference.defaultsKey) {
+            do { chosenNativeCodex = try NativeCodexPreference.decode(preference as? Data ?? Data()).path }
+            catch { nativeChoiceUnavailable = true; nativeCodexStatus = "Saved native file choice cannot be read. Choose again or use the default." }
+        }
         refreshDiagnostics()
+    }
+    func chooseNativeCodex() {
+        guard !demo, !checkingNativeCodex else { return }
+        let panel = NSOpenPanel()
+        panel.title = "Choose native Codex \(BridgeCompatibility.nativeClientVersion)"
+        panel.message = "Select the native arm64 executable named codex. The read-only version check does not start a conversation."
+        panel.canChooseDirectories = false; panel.canChooseFiles = true; panel.allowsMultipleSelection = false
+        panel.resolvesAliases = false
+        guard panel.runModal() == .OK, let path = panel.url?.path else { return }
+        verifyNativeCodex(path, saveChoice: true)
+    }
+    func checkNativeCodex() {
+        guard let path = nativeCodexPath else { return }
+        verifyNativeCodex(path, saveChoice: false)
+    }
+    func useDefaultNativeCodex() {
+        guard !demo, !checkingNativeCodex else { return }
+        chosenNativeCodex = nil; nativeChoiceUnavailable = false; nativeCheckFailed = false
+        nativeCodexStatus = "Default file selected · Each launch still checks the native version"
+        if canSaveNativeChoice { UserDefaults.standard.removeObject(forKey: NativeCodexPreference.defaultsKey) }
+    }
+    private func verifyNativeCodex(_ path: String, saveChoice: Bool) {
+        guard !demo, !checkingNativeCodex else { return }
+        checkingNativeCodex = true; nativeCodexStatus = "Checking native file/version · Up to 30 seconds"
+        Task { [weak self] in
+            let failure = await Task.detached {
+                do { try NativeCodex.verifyVersion(path); return nil as String? }
+                catch { return error.localizedDescription }
+            }.value
+            guard let self else { return }
+            self.checkingNativeCodex = false
+            if let failure {
+                // An unsuccessful new selection does not replace the existing choice.
+                if !saveChoice { self.nativeCheckFailed = true }
+                self.nativeCodexStatus = failure + (saveChoice ? " Current file choice was kept." : "")
+                return
+            }
+            if saveChoice {
+                do {
+                    let preference = try NativeCodexPreference(path: path)
+                    if self.canSaveNativeChoice { UserDefaults.standard.set(try preference.encoded(), forKey: NativeCodexPreference.defaultsKey) }
+                    self.chosenNativeCodex = preference.path; self.nativeChoiceUnavailable = false
+                } catch { self.nativeCodexStatus = "The selected native file choice could not be saved."; return }
+            }
+            self.nativeCheckFailed = false
+            self.nativeCodexStatus = "Native Codex \(BridgeCompatibility.nativeClientVersion) verified · This check does not verify backend, login or iTerm API access"
+        }
     }
     func start() {
         if demo { onCountChanged?(attentionCount); return }
@@ -238,13 +309,14 @@ import Darwin
             try watchInbox(storage)
             var committed = state
             try notificationDelivery.flush(in: &committed, save: storage.save)
-            state = committed
+            if state != committed { state = committed }
             let batch = try storage.scan()
             let result = try InboxConsumer.consume(state, events: batch.events, rejected: batch.rejected,
                 now: Date(), notificationsEnabled: notificationsEnabled && !paused && !CommandLine.arguments.contains("--no-notifications"),
                 save: storage.save, acknowledge: storage.acknowledge)
-            state = result.state
-            monitoringHealth = result.acknowledgementFailures > 0 ? .acknowledgementFailed : .ready
+            if state != result.state { state = result.state }
+            let health: MonitoringHealth = result.acknowledgementFailures > 0 ? .acknowledgementFailed : .ready
+            if monitoringHealth != health { monitoringHealth = health }
             for event in notificationDelivery.due(in: state, now: Date()) {
                 if let session = state.sessions[event.sessionID] { onNotify?(event, session) }
             }
@@ -260,19 +332,19 @@ import Darwin
     func focus(_ id: String) async {
         await performFocus(id, requiredInstance: nil, action: "menu_selection")
     }
-    func focusNotification(_ id: String, instance: String?) async {
+    func focusNotification(_ id: String, instance: String?, callbackStarted: UInt64? = nil) async {
         guard let instance else {
             recordRoute(id, requested: nil, notification: true, outcome: .missingReference)
             message = "This notification has no verified original process. Your attention list is preserved."
             return
         }
-        await performFocus(id, requiredInstance: instance, action: "native_notification_click")
+        await performFocus(id, requiredInstance: instance, action: "native_notification_click", callbackStarted: callbackStarted)
     }
-    private func recordRoute(_ id: String, requested: String?, notification: Bool, outcome: RoutingAttempt.Outcome) {
+    private func recordRoute(_ id: String, requested: String?, notification: Bool, outcome: RoutingAttempt.Outcome, elapsedMilliseconds: Double? = nil) {
         guard !demo else { return }
         state.recordRoutingAttempt(.init(sessionID: id, requestedSource: requested,
             currentSource: state.sessions[id]?.verifiedProtocolBinding?.reference,
-            notificationClick: notification, outcome: outcome))
+            notificationClick: notification, outcome: outcome, elapsedMilliseconds: elapsedMilliseconds))
         do { try storage?.save(state) }
         catch { message = "Routing history could not be saved. Your attention list is preserved." }
     }
@@ -321,12 +393,21 @@ import Darwin
         } catch { message = "Notification history could not be saved. Your attention list is preserved; saving will retry." }
     }
     func refreshDiagnostics() {
-        buildStatus = BuildStatus(running: runningBuildUUID, onDisk: RuntimeBuildProbe.diskUUID())
-        installedHelperBuildUUID = RuntimeBuildProbe.helperDiskUUID()
-        deliveryHealth = notificationDelivery.health(in: state, now: Date())
+        let build = BuildStatus(running: runningBuildUUID, onDisk: RuntimeBuildProbe.diskUUID())
+        if buildStatus != build { buildStatus = build }
+        let helper = RuntimeBuildProbe.helperDiskUUID()
+        if installedHelperBuildUUID != helper { installedHelperBuildUUID = helper }
+        let delivery = notificationDelivery.health(in: state, now: Date())
+        if deliveryHealth != delivery { deliveryHealth = delivery }
         guard !demo, let storage else { return }
-        do { snapshotBytes = try storage.snapshotBytes(); snapshotReadFailed = false }
-        catch { snapshotBytes = nil; snapshotReadFailed = true }
+        do {
+            let bytes = try storage.snapshotBytes()
+            if snapshotBytes != bytes { snapshotBytes = bytes }
+            if snapshotReadFailed { snapshotReadFailed = false }
+        } catch {
+            if snapshotBytes != nil { snapshotBytes = nil }
+            if !snapshotReadFailed { snapshotReadFailed = true }
+        }
         struct Report: Encodable {
             let pid: Int32
             let receiverStartedAt: Date
@@ -345,6 +426,8 @@ import Darwin
             let delivery: NotificationDeliveryHealth
             let snapshotBytes: Int64?
             let snapshotReadFailed: Bool
+            let verifiedNotificationReturnLatency: LatencySummary
+            let nativeDependencyChoice: String
         }
         do {
             let data = try JSONEncoder().encode(Report(pid: getpid(), receiverStartedAt: receiverStartedAt,
@@ -358,9 +441,12 @@ import Darwin
                     "threadsToReview": overview.attentionCount, "activeTurns": overview.workingCount],
                 unavailableTerminalChecks: threadVisibility.unavailableProcessIDs.count,
                 unreviewedCoverageNotices: sessions.filter { $0.protocolCoverageNotice?.reviewed == false }.count,
-                delivery: deliveryHealth, snapshotBytes: snapshotBytes, snapshotReadFailed: snapshotReadFailed))
-            try storage.saveRuntimeDiagnostics(data); diagnosticWriteFailed = false
-        } catch { diagnosticWriteFailed = true }
+                delivery: deliveryHealth, snapshotBytes: snapshotBytes, snapshotReadFailed: snapshotReadFailed,
+                verifiedNotificationReturnLatency: .init(state.routingAttempts ?? []),
+                nativeDependencyChoice: nativeChoiceUnavailable ? "unreadable" : chosenNativeCodex == nil ? "default" : "custom"))
+            try storage.saveRuntimeDiagnostics(data)
+            if diagnosticWriteFailed { diagnosticWriteFailed = false }
+        } catch { if !diagnosticWriteFailed { diagnosticWriteFailed = true } }
     }
     var buildDescription: String {
         let running = buildStatus.running.map { String($0.prefix(13)) } ?? "Unverified"
@@ -383,6 +469,17 @@ import Darwin
         if let date = h.nextRetryAt { value += "\nNext retry eligible at " + date.formatted(date: .omitted, time: .standard) }
         return value
     }
+    var returnTimingDescription: String {
+        timingDescription(.init(state.routingAttempts ?? []), scope: "Verified notification returns · Retained audit")
+    }
+    var submissionTimingDescription: String {
+        timingDescription(deliveryHealth.acceptedEventLatency, scope: "Observed event to macOS acceptance · This receiver") +
+            "\nIncludes retries; does not measure visible banner delivery. \(deliveryHealth.excludedLatencyObservations) invalid-clock samples excluded."
+    }
+    private func timingDescription(_ value: LatencySummary, scope: String) -> String {
+        guard let p50 = value.p50Milliseconds, let p95 = value.p95Milliseconds else { return scope + "\nNo measured samples yet" }
+        return scope + "\n\(value.samples) samples · p50 \(p50.formatted(.number.precision(.fractionLength(0)))) ms · p95 \(p95.formatted(.number.precision(.fractionLength(0)))) ms"
+    }
     var storageDescription: String {
         var value = snapshotReadFailed ? "Snapshot size unavailable" : snapshotBytes.map {
             String(format: "%.2f MiB of 64 MiB snapshot limit", Double($0) / 1_048_576)
@@ -404,9 +501,11 @@ import Darwin
         case .unavailable: return "Monitoring could not start"
         }
     }
-    private func performFocus(_ id: String, requiredInstance: String?, action: String) async {
+    private func performFocus(_ id: String, requiredInstance: String?, action: String, callbackStarted: UInt64? = nil) async {
+        let routeStarted = min(callbackStarted ?? DispatchTime.now().uptimeNanoseconds, DispatchTime.now().uptimeNanoseconds)
         var outcome: RoutingAttempt.Outcome = .refused
-        defer { recordRoute(id, requested: requiredInstance, notification: action == "native_notification_click", outcome: outcome) }
+        defer { recordRoute(id, requested: requiredInstance, notification: action == "native_notification_click", outcome: outcome,
+                            elapsedMilliseconds: Double(DispatchTime.now().uptimeNanoseconds - routeStarted) / 1e6) }
         guard !demo else { message = "Preview sessions are examples. Connect Codex to open a real terminal."; return }
         guard focusInProgress == nil else { message = "Another session is opening. Retry this reminder in a moment."; return }
         guard let session = state.sessions[id] else {

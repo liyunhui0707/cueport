@@ -53,5 +53,7 @@ final class BridgeLaunchOptionsTests: XCTestCase {
         let fresh = try BridgeLaunchOptions(codexArguments: [])
         XCTAssertEqual(fresh.shellCommand(executable: "/app/aar", dataDirectory: "/data"),
             "'/app/aar' codex --data-dir '/data' --")
+        XCTAssertEqual(picker.shellCommand(executable: "/app/aar", dataDirectory: "/data", nativeExecutable: "/Native App's/$(literal)/codex"),
+            "'/app/aar' codex --data-dir '/data' --native-codex '/Native App'\\''s/$(literal)/codex' -- resume")
     }
 }

@@ -46,6 +46,21 @@ final class NotificationDeliveryTests: XCTestCase {
     }
     enum Failure: Error { case injected }
 
+    func testTimingCountsActualAcceptanceOnceEvenWhenReceiptSaveNeedsRetry() throws {
+        let store = try store(), event = question(), delivery = NotificationDelivery()
+        var state = RouterState(); try state.apply(event)
+        let plan = try XCTUnwrap(delivery.prepare(event, sourceInstance: event.protocolBinding?.reference,
+            in: &state, now: now, save: store.save))
+        XCTAssertThrowsError(try delivery.complete(plan, accepted: true, in: &state, now: now.addingTimeInterval(0.125),
+            save: { _ in throw Failure.injected }))
+        try delivery.complete(plan, accepted: true, in: &state, now: now.addingTimeInterval(1), save: store.save)
+        try delivery.flush(in: &state, save: store.save)
+        let health = delivery.health(in: state, now: now)
+        XCTAssertEqual(health.acceptedEventLatency.samples, 1)
+        XCTAssertEqual(try XCTUnwrap(health.acceptedEventLatency.p95Milliseconds), 125, accuracy: 0.001)
+        XCTAssertEqual(health.excludedLatencyObservations, 0)
+    }
+
     func testAcknowledgementFailureStillCommitsIntentAndReplayIsHarmless() throws {
         let store = try store(), event = question()
         try store.enqueue(event)

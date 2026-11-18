@@ -16,6 +16,7 @@ import statistics
 import subprocess
 import time
 import uuid
+from manage_install import fingerprint
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 APP = pathlib.Path(os.environ.get("AAR_REVIEW_APP", str(ROOT / "build/Agent Attention Router.app")))
@@ -109,11 +110,21 @@ def main():
     directory = BASE / ("run-" + uuid.uuid4().hex)
     directory.mkdir(mode=0o700)
     clone = directory / "ResourceMeasurement.app"
+    source_fingerprint = fingerprint(APP)
+    source_executable_sha256 = hashlib.sha256((APP / "Contents/MacOS/AgentAttentionRouter").read_bytes()).hexdigest()
     shutil.copytree(APP, clone)
+    assert fingerprint(clone) == source_fingerprint, "Source bundle changed during measurement staging"
     bundle_id = "org.agentattentionrouter.resource-measurement." + uuid.uuid4().hex
     info = clone / "Contents/Info.plist"
     values = plistlib.loads(info.read_bytes())
-    values.update(CFBundleIdentifier=bundle_id, CFBundleDisplayName="Attention Router Resource Measurement", AARBuildChannel="review")
+    # Keep the selected artifact's presentation. Forcing a daily bundle into
+    # review mode adds a permanently drawn TEST title absent from shipping idle
+    # behavior, including its font/layout allocations. Isolation comes from the
+    # unique bundle ID and explicit private data root, not from that UI label.
+    channel = values.get("AARBuildChannel", "daily")
+    assert channel in ("daily", "review"), "Unknown artifact channel"
+    validation_label = values.get("AARValidationBuild", False)
+    values.update(CFBundleIdentifier=bundle_id, CFBundleDisplayName="Attention Router Resource Measurement")
     info.write_bytes(plistlib.dumps(values))
     run(["/usr/bin/codesign", "--force", "--sign", "-", "--identifier", bundle_id, str(clone)], check=True)
     executable = clone / "Contents/MacOS/AgentAttentionRouter"
@@ -172,7 +183,9 @@ def main():
         assert not state.get("sessions") and not state.get("processed")
         assert not state.get("pendingNotifications") and not state.get("notificationReceipts")
         report = {"started_at_utc": started_at, "receiver_build": ready["build"].get("running"),
-                  "source_executable_sha256": hashlib.sha256((APP / "Contents/MacOS/AgentAttentionRouter").read_bytes()).hexdigest(),
+                  "presentation_channel": channel, "validation_label": validation_label,
+                  "source_executable_sha256": source_executable_sha256,
+                  "source_bundle_fingerprint": source_fingerprint,
                   "duration_target_s": DURATION, "warmup_s": WARMUP, "sample_interval_s": INTERVAL,
                   "max_sample_gap_s": round(max_gap, 3), "qualified_timing": qualified,
                   "isolated_empty": empty, "processes": results,
@@ -180,6 +193,7 @@ def main():
                                   "all_sampled_rss_below_80_mib": qualified and empty["max_rss_mib"] < 80},
                   "notes": ["RSS from ps KiB; CPU-time delta / monotonic elapsed, one core=100%; counter resolution 0.01s.",
                             "Live fixed cohort is observational, uncontrolled workload; exits invalidate full-cohort duration.",
+                            "Source presentation retained; historical forced-review TEST-label results remain separate.",
                             "No native Codex/daemon/model resources included; summed RSS can double-count shared pages.",
                             "No input, banners, focus, permissions, real-store writes or changes to live processes."]}
         save(directory / "samples.json", {"ticks_s": ticks, "processes": series})

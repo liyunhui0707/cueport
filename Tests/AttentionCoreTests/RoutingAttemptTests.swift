@@ -2,6 +2,27 @@ import XCTest
 @testable import AttentionCore
 
 final class RoutingAttemptTests: XCTestCase {
+    func testLatencyKeepsLegacyAuditAndDoesNotCountFailuresOrUntimedVisits() throws {
+        let legacy = Data(#"{"timestamp":0,"sessionKey":"hash","displayReference":"sample","notificationClick":true,"outcome":"dispatched"}"#.utf8)
+        let old = try JSONDecoder().decode(RoutingAttempt.self, from: legacy)
+        XCTAssertNil(old.elapsedMilliseconds)
+        var attempts = [old]
+        for index in 1...20 {
+            attempts.append(.init(sessionID: "s", requestedSource: "same-origin", currentSource: "same-origin",
+                notificationClick: true, outcome: .dispatched, elapsedMilliseconds: Double(index)))
+        }
+        attempts.append(.init(sessionID: "s", requestedSource: nil, currentSource: nil,
+            notificationClick: true, outcome: .dispatchFailed, elapsedMilliseconds: 9999))
+        attempts.append(.init(sessionID: "s", requestedSource: nil, currentSource: nil,
+            notificationClick: false, outcome: .dispatched, elapsedMilliseconds: 9999))
+        let result = LatencySummary(attempts)
+        XCTAssertEqual(result.samples, 20); XCTAssertEqual(result.p50Milliseconds, 10)
+        XCTAssertEqual(result.p95Milliseconds, 19)
+        let invalid = RoutingAttempt(sessionID: "s", requestedSource: nil, currentSource: nil,
+            notificationClick: true, outcome: .dispatched, elapsedMilliseconds: .nan)
+        XCTAssertNil(invalid.elapsedMilliseconds)
+        XCTAssertNoThrow(try JSONEncoder().encode(invalid))
+    }
     func testRetiredNotificationCannotFollowResumedThreadOrSharedSource() throws {
         let old = ProtocolOriginBinding(id: "old-subscription", origin: .init(
             terminal: .init(sessionID: "12345678-1234-1234-1234-123456789ABC"),

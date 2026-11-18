@@ -6,6 +6,7 @@ import re
 import shutil
 import subprocess
 import sys
+import tempfile
 import uuid
 
 root = pathlib.Path(__file__).resolve().parent.parent
@@ -30,17 +31,29 @@ macos = app / "Contents" / "MacOS"
 resources = app / "Contents" / "Resources"
 macos.mkdir(parents=True, exist_ok=True)
 resources.mkdir(parents=True, exist_ok=True)
+shutil.copy2(root / "THIRD_PARTY_NOTICES.md", resources / "ThirdPartyNotices.md")
 subprocess.run(["swift", str(root / "scripts/render_icon.swift"), str(root / "build/AppIcon.iconset")], check=True)
 subprocess.run(["/usr/bin/iconutil", "-c", "icns", str(root / "build/AppIcon.iconset"), "-o", str(resources / "AppIcon.icns")], check=True)
+with tempfile.TemporaryDirectory(prefix="status-assets-", dir=root / "build") as temporary:
+    catalog = pathlib.Path(temporary) / "Status.xcassets"
+    image_set = catalog / "AARStatusIndicator.imageset"
+    image_set.mkdir(parents=True)
+    subprocess.run(["swift", str(root / "scripts/render_status_asset.swift"), str(image_set)], check=True)
+    subprocess.run(["/usr/bin/xcrun", "actool", str(catalog), "--compile", str(resources),
+                    "--platform", "macosx", "--minimum-deployment-target", "14.0",
+                    "--target-device", "mac", "--output-partial-info-plist",
+                    str(pathlib.Path(temporary) / "asset-info.plist")], check=True, capture_output=True)
+    if not (resources / "Assets.car").is_file():
+        raise SystemExit("Status template asset catalog was not produced")
 for name in ["AgentAttentionRouter", "aar"]:
     # A bridge worker may still have the previous executable mapped. Never
     # overwrite that inode: macOS can kill it when signed code pages change.
     staging = macos / ("." + name + "-" + uuid.uuid4().hex)
     shutil.copy2(root / "build" / "swift" / mode / name, staging)
     if mode == "release":
-        # Debug-map symbols contain the build host's absolute source paths.
-        # Remove only debugging symbols, then sign the modified helper itself.
-        subprocess.run(["/usr/bin/strip", "-S", str(staging)], check=True, capture_output=True)
+        # Omit debug-map/source paths and local linker symbols from distribution.
+        # Keep global symbols and runtime metadata; retain local dSYMs separately.
+        subprocess.run(["/usr/bin/strip", "-S", "-x", str(staging)], check=True, capture_output=True)
     if name == "aar":
         subprocess.run(["/usr/bin/codesign", "--force", "--sign", "-", "--identifier", bundle_id + ".helper", str(staging)], check=True, capture_output=True)
     staging.replace(macos / name)
@@ -68,5 +81,9 @@ if version is not None:
                 AARReleaseVersion=version)
 (app / "Contents" / "Info.plist").write_bytes(plistlib.dumps(info))
 subprocess.run(["/usr/bin/codesign", "--force", "--sign", "-", "--identifier", info["CFBundleIdentifier"], str(app)], check=True)
+asset_check = root / "build/check-status-asset"
+subprocess.run(["swiftc", "-parse-as-library", str(root / "scripts/check_status_asset.swift"),
+                "-o", str(asset_check)], check=True)
+subprocess.run([str(asset_check), str(app)], check=True)
 print(f"Local development bundle: {app}")
 print("Signing: local ad-hoc only (no Developer ID). Notarization: not performed. No installation or Hook changes.")

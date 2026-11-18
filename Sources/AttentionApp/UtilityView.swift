@@ -30,7 +30,7 @@ struct UtilityView: View {
             group("NOTIFICATIONS") {
                 VStack(spacing: 16) {
                     settingRow("System notifications", subtitle: model.notificationStatus) {
-                        if model.notificationsEnabled { Toggle("Enabled", isOn: $model.notificationsEnabled).labelsHidden().toggleStyle(.switch).controlSize(.small) }
+                        if model.notificationsEnabled { Toggle("Enabled", isOn: $model.notificationsEnabled).labelsHidden().toggleStyle(.switch).controlSize(.small).accessibilityLabel("System notifications") }
                         else { Button("Enable…") { model.requestNotifications() }.controlSize(.small) }
                     }
                     Divider()
@@ -71,10 +71,10 @@ struct UtilityView: View {
                     HStack {
                         Button(model.bridgePOC ? "Copy launch command" : "Copy setup command") {
                             copyCommand(resume: false)
-                        }.controlSize(.small).disabled(model.startupBlocked || model.demo)
+                        }.controlSize(.small).disabled(model.startupBlocked || model.demo || (model.bridgePOC && !model.canCopyNativeCommands))
                         if model.bridgePOC {
                             Button("Copy resume command") { copyCommand(resume: true) }
-                                .controlSize(.small).disabled(model.startupBlocked || model.demo)
+                                .controlSize(.small).disabled(model.startupBlocked || model.demo || !model.canCopyNativeCommands)
                                 .help("Choose an existing conversation in the native Codex picker.")
                         }
                         Spacer()
@@ -86,6 +86,8 @@ struct UtilityView: View {
                     }
                     Divider()
                     startupContent
+                    Divider()
+                    nativeCodexContent
                 }
             }
         }
@@ -95,7 +97,8 @@ struct UtilityView: View {
         let command: String
         if model.bridgePOC {
             guard let launch = try? BridgeLaunchOptions(codexArguments: resume ? ["resume"] : []) else { return }
-            command = launch.shellCommand(executable: executable, dataDirectory: model.root.path)
+            guard model.canCopyNativeCommands else { return }
+            command = launch.shellCommand(executable: executable, dataDirectory: model.root.path, nativeExecutable: model.chosenNativeCodex)
         } else {
             command = "'" + executable.replacingOccurrences(of: "'", with: "'\\''") + "' install-hooks"
         }
@@ -134,6 +137,28 @@ struct UtilityView: View {
             }
         }
     }
+    var nativeCodexContent: some View {
+        VStack(alignment: .leading, spacing: 9) {
+            Text("NATIVE CODEX FILE").font(.system(size: 10, weight: .semibold)).foregroundStyle(.secondary)
+            Text(model.demo ? "Sample native Codex · No checks performed" : model.nativeCodexStatus)
+                .font(.system(size: 11)).fixedSize(horizontal: false, vertical: true)
+            Text(model.demo ? "/synthetic/native/codex" : model.nativeCodexPath ?? "Saved choice unavailable")
+                .font(.system(size: 10)).foregroundStyle(.secondary).textSelection(.enabled)
+                .fixedSize(horizontal: false, vertical: true)
+            HStack {
+                Button("Choose native file…") { model.chooseNativeCodex() }.controlSize(.small)
+                Button("Use default") { model.useDefaultNativeCodex() }.controlSize(.small)
+                    .disabled(model.chosenNativeCodex == nil && !model.nativeChoiceUnavailable)
+                Button("Check file/version") { model.checkNativeCodex() }.controlSize(.small)
+                    .disabled(model.nativeChoiceUnavailable)
+                if model.checkingNativeCodex { ProgressView().controlSize(.small) }
+            }.disabled(model.demo || model.checkingNativeCodex)
+            Text("Only native arm64 Codex \(BridgeCompatibility.nativeClientVersion) is supported. This changes future copied launch/resume commands; open sessions keep running. It does not install dependencies, edit Codex settings or start its backend.")
+                .font(.system(size: 10)).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+            Text(model.demo ? "Sample preference scope" : model.nativeChoiceScopeDescription)
+                .font(.system(size: 10)).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+        }
+    }
     var diagnosticsContent: some View {
         VStack(alignment: .leading, spacing: 18) {
             retainedRecordsContent
@@ -144,6 +169,10 @@ struct UtilityView: View {
                     diagnostic("Last agent reminder · This receiver", value: model.submissionDescription, icon: "paperplane")
                     Divider()
                     diagnostic("Pending reminders", value: model.queueDescription, icon: "clock.arrow.circlepath")
+                    Divider()
+                    diagnostic("Verified return timing", value: model.returnTimingDescription, icon: "stopwatch")
+                    Divider()
+                    diagnostic("Reminder submission timing", value: model.submissionTimingDescription, icon: "timer")
                     Divider()
                     diagnostic("Snapshot and saving", value: model.storageDescription, icon: "externaldrive")
                 }
@@ -164,14 +193,33 @@ struct UtilityView: View {
             if model.hasBridgeBuildDiagnostics {
                 workerBuildContent
             }
+            DisclosureGroup("What the status labels mean") {
+                VStack(alignment: .leading, spacing: 10) {
+                    statusMeaning("Turn active", "A Codex turn is active and may also be waiting for input. It does not prove continuous execution.")
+                    statusMeaning("Question queued", "A question was observed. Handle it in the original Codex terminal; the agent may keep working.")
+                    statusMeaning("Answer submitted · Unconfirmed", "An editor submission was observed. This alone does not prove the answer was accepted or the request finished.")
+                    statusMeaning("Status unconfirmed / Coverage notice", "Monitoring cannot prove this state. Check the original session; a notice is not another question.")
+                    statusMeaning("Turn stopped", "A stopped turn was observed. It does not mean Codex exited or the entire project is finished.")
+                    statusMeaning("Reviewed", "You returned to the verified terminal. Review does not answer, approve or resolve a request.")
+                    statusMeaning("To review", "Visible thread records needing attention, not a count of confirmed human blockers.")
+                }.padding(.top, 10)
+            }.font(.system(size: 12)).padding(16).background(Design.card, in: RoundedRectangle(cornerRadius: 13))
             group("IF A TERMINAL DOESN’T OPEN") {
                 VStack(alignment: .leading, spacing: 10) {
                     Text("Keep the original iTerm2 pane open. Enable the Python API in iTerm2 Settings → General → Magic and review its connection request.").font(.system(size: 12)).foregroundStyle(.secondary).lineSpacing(4)
+                    Text("If connected Codex reports a backend or handshake error after its file/version check passes, review the normal Codex setup and login. The file check does not start or repair its backend.").font(.system(size: 11)).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                    Text("If a reminder reaches Notification Center without a banner, check macOS Focus and screen-sharing notification settings. System acceptance alone does not prove visible delivery.").font(.system(size: 11)).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
                     Text("A missing or ambiguous session is never replaced by another terminal.").font(.system(size: 11)).foregroundStyle(.secondary)
                     Button("Refresh diagnostics") { model.refreshDiagnostics(); model.refreshAuthorization() }.controlSize(.small).padding(.top, 2)
                 }
             }
         }
+    }
+    private func statusMeaning(_ title: String, _ explanation: String) -> some View {
+        VStack(alignment: .leading, spacing: 3) {
+            Text(title).font(.system(size: 11, weight: .medium))
+            Text(explanation).font(.system(size: 11)).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+        }.accessibilityElement(children: .combine)
     }
     var retainedRecordsContent: some View {
         group("RETAINED THREAD RECORDS") {

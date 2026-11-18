@@ -137,6 +137,7 @@ struct SessionCard: View {
     var workerBuild: BridgeWorkerBuildStatus? = nil
     var action: () -> Void
     @State private var hovering = false
+    @FocusState private var keyboardFocused: Bool
     var questions: [AttentionRequest] { session.outstanding.filter { $0.kind == .question } }
     var approvals: [AttentionRequest] { session.outstanding.filter { $0.kind == .approval } }
     var uncertain: Bool { session.outstanding.contains { $0.evidence == .unknown } }
@@ -202,11 +203,13 @@ struct SessionCard: View {
                 if busy { ProgressView().controlSize(.small).frame(width: 12, height: 20) }
                 else { Image(systemName: "arrow.up.right").font(.system(size: 10, weight: .semibold)).foregroundStyle(hovering ? color : Color.secondary.opacity(0.45)).padding(.top, 3) }
             }.padding(12).contentShape(RoundedRectangle(cornerRadius: 12))
-                .background(hovering ? color.opacity(0.055) : Design.card, in: RoundedRectangle(cornerRadius: 12))
-                .overlay(RoundedRectangle(cornerRadius: 12).stroke(hovering ? color.opacity(0.32) : Design.line, lineWidth: 1))
+                .background(hovering || keyboardFocused ? color.opacity(0.055) : Design.card, in: RoundedRectangle(cornerRadius: 12))
+                .overlay(RoundedRectangle(cornerRadius: 12).stroke(keyboardFocused ? Design.blue : hovering ? color.opacity(0.32) : Design.line, lineWidth: keyboardFocused ? 2 : 1))
         }.buttonStyle(.plain).disabled(busy).onHover { hovering = $0 }
-            .help(workerBuild?.detail ?? "Open the exact original terminal session")
-            .accessibilityLabel("\(session.project), Codex, \(title), \(session.execution.rawValue), \(session.submittedQuestions.count) answers submitted but unconfirmed, \(session.uncertainQuestions.count) other question states unconfirmed. \(workerBuild?.summary ?? "")")
+            .focused($keyboardFocused)
+            .help(session.project + "\n" + (workerBuild?.detail ?? "Open the exact original terminal session"))
+            .accessibilityLabel("\(session.project), Codex, \(title), \(session.execution.rawValue), \(approvals.count) approval requests, \(session.submittedQuestions.count) answers submitted but unconfirmed, \(session.uncertainQuestions.count) other question states unconfirmed. \(session.completionAt != nil && !session.completionReviewed ? "Unreviewed stopped turn." : "") \(workerBuild?.summary ?? "")")
+            .accessibilityValue(busy ? "Opening original terminal" : "")
             .accessibilityHint("Opens the original iTerm2 pane. Does not answer or approve requests. \(session.protocolCoverageNotice?.detail ?? "")")
     }
 }

@@ -15,9 +15,30 @@ is packaged from the same build as the retained `aar` alias, avoiding SwiftPM
 case-insensitive product-name collisions with the Cueport receiver.
 
 No new model task or READY test is part of this rename. Historical results below
-qualify their actual alpha.3 artifacts, not new alpha.4 native acceptance. New
-regression, exact package, installer rename/rollback, visual render and resource
-results are recorded after execution; incomplete evidence is not passed by waiver.
+qualify their actual alpha.3 artifacts, not new alpha.4 native acceptance. The existing 198 Swift +11 CLI +5 migration +3 archive +2 website checks pass,
+including the public source CI. The actual current CLI (unchanged helper UUID)
+passed all11 packaged behavior checks. Signed app install/update, legacy rename,
+injected rename failure restoration and app-only rollback passed. Native startup
+checks preserve/restores preferences, refuse duplicate receivers and isolate
+explicit data roots. No real terminal API/model task was used by these checks.
+
+The exact final Cueport receiver completed 600.037s /121samples:
+mean/max RSS75.961/78.891MiB, CPU0.04500% of one core.
+All sampled RSS remained strictly below80MiB with unchanged10s warmup/5s cadence.
+Two preceding preparations failed at81.203 and80.422MiB and were never installed
+or released. Transient setup objects are drained before idle; application menu
+creation is deferred until the panel, Settings or Dock is shown. Retain failed
+observations rather than transferring a measurement to different binaries.
+This empty-receiver measurement excludes loaded UI, Codex/backend and other hosts.
+
+The native synthetic Settings window showed Cueport, alpha.4/build4, controls and
+Quit Cueport. After Command-Q the owned process exited; the immediate AX readback
+timed out, so that UI-tool limitation is retained. Light/dark synthetic panels,
+Settings and the new icon were inspected. These are not model/notification trials.
+No further native model input was sent. Both daily application upgrades retain
+their prior preferences/current data; stopped-profile migration keeps originals.
+Full Dock, VoiceOver/Spaces/native-notification matrices and the12-hour soak remain
+separate/incomplete; incomplete evidence is never passed by waiver.
 
 ## Historical alpha.3 automated and package evidence
 

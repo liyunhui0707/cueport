@@ -36,7 +36,17 @@ enum BridgeMigration {
     static func remember(_ root: URL, apply: Bool) throws {
         let profile = try BridgeStartupProfile(root: root)
         guard apply else { print("Plan: remember the selected private bridge folder for the daily application"); return }
-        guard let preferences = UserDefaults(suiteName: "org.agentattentionrouter.local-development") else { throw RouterError.unsafeStorage }
+        let domain = "org.agentattentionrouter.local-development"
+        // A packaged helper resolves to its enclosing application's identity.
+        // Foundation rejects adding that same identity as a suite; use the
+        // existing standard domain in that case. Standalone helpers still need
+        // the explicit app domain rather than their own executable identity.
+        let preferences: UserDefaults
+        if Bundle.main.bundleIdentifier == domain { preferences = .standard }
+        else {
+            guard let suite = UserDefaults(suiteName: domain) else { throw RouterError.unsafeStorage }
+            preferences = suite
+        }
         preferences.set(try profile.encoded(), forKey: BridgeStartupProfile.defaultsKey)
         guard preferences.synchronize(),
               let saved = preferences.data(forKey: BridgeStartupProfile.defaultsKey),

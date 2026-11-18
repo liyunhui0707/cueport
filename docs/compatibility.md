@@ -13,7 +13,7 @@ Pass. See [current evidence](quality.md) and [historical alpha.2 evidence](quali
 | Recovery | Eight authenticated replacement attempts within120s per incident, stable60s resets budget, no task/approval replay. Peer, process birth, foreground TTY and exact unique terminal remain mandatory. |
 | Local notifications | Five new accurate returns; one retained focus-verification refusal; thirty-success target not completed. |
 | Air notifications | Current-candidate native check incomplete after missing-backend repair. Historical alpha.1/alpha.2 checks are not current acceptance. |
-| Resource gate | Current empty receiver:121samples/600.035s, peak74.094MiB, CPU0.045%;12-hour observations still running. |
+| Resource gate | Current empty receiver:121samples/600.029s, peak78.719MiB, CPU0.03666%;12-hour observations still running. |
 | Native UI | Settings/version/update-source labels and Dock switch state checked; visible Dock/reopen and full current-release accessibility/Spaces matrices incomplete. |
 | Data/tools | Synthetic stopped-profile migration and recoverable unused-build cleanup checks pass; never overwrite a live/newer profile or restore stale data with app rollback. |
 | Signing | Ad-hoc only; no Developer ID/notarization or automatic app updater. |

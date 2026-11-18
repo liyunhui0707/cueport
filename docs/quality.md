@@ -9,6 +9,10 @@ than continue repetitive READY tasks. Incomplete checks below remain incomplete.
 
 - 198 Swift, 11 executable, 5 stopped-data migration, 3 recoverable app-archive
   and 2 website checks passed on the development host.
+- A real bundled-helper setup failure was found before release: Foundation
+  rejected the app identity as its own suite. The final helper uses its standard
+  domain when bundled, and the explicit app suite only when standalone. Actual
+  Air startup preference readback qualifies this correction separately.
 - Actual signed installation/update, app-only rollback, injected swap failure
   restoration, active-receiver refusal and data preservation checks passed in
   private synthetic temporary locations.
@@ -24,9 +28,9 @@ than continue repetitive READY tasks. Incomplete checks below remain incomplete.
 
 ## Resource scope
 
-The exact daily candidate's empty receiver completed 600.035 seconds / 121
+The exact daily candidate's empty receiver completed 600.029 seconds / 121
 samples, with a 10-second warmup and 5-second sampling. Mean/max RSS was
-44.196/74.094 MiB; CPU 0.045% of one core. Every sampled RSS was strictly below
+75.595/78.719 MiB; CPU 0.03666% of one core. Every sampled RSS was strictly below
 80 MiB. Existing daily clients were preserved. Native/backend/model resources,
 loaded UI, other hosts and longer durations are excluded from this measurement.
 Earlier memory failures are not deleted or reclassified.
@@ -40,7 +44,9 @@ real TUI identity, model continuity or notification return.
 
 ## Native results and known gaps
 
-Six new fixed local READY tasks were sent with native 0.170.0. Five system
+Six new fixed local READY tasks were sent with native 0.170.0 before the final
+packaged-helper preference correction. The receiver program/resources and
+transport core are unchanged; final-helper native trials were not repeated. Five system
 notification clicks had matching fresh original-source/exact-focus audits. One
 click safely failed bounded focus readback and remained unreviewed; its original
 mismatch cause is unconfirmed. A later unchanged-adapter direct return probe

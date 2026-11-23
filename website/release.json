@@ -1,8 +1,8 @@
 {
-  "version": "0.1.0-alpha.4",
-  "release_url": "https://github.com/liyunhui0707/cueport/releases/tag/v0.1.0-alpha.4",
-  "download_url": "https://github.com/liyunhui0707/cueport/releases/download/v0.1.0-alpha.4/Cueport-0.1.0-alpha.4-macos-arm64.zip",
-  "sha256": "687f0c6082cb5e46aeac3fe9f5d57fa07b6a4dd8547e5a7cc10be8ef5100ea50",
+  "version": "0.1.0-alpha.5",
+  "release_url": "https://github.com/liyunhui0707/cueport/releases/tag/v0.1.0-alpha.5",
+  "download_url": "https://github.com/liyunhui0707/cueport/releases/download/v0.1.0-alpha.5/Cueport-0.1.0-alpha.5-macos-arm64.zip",
+  "sha256": "f76a2f2ab935ab6440c594993952e5c5f24714f4e0533cf46d74f975f3f9b905",
   "supported_codex": [
     "0.169.0",
     "0.170.0"

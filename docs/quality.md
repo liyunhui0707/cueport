@@ -1,4 +1,14 @@
-# Cueport alpha.4 evidence and historical alpha.3 scope
+# Cueport release evidence
+
+## Alpha.5 / build 5
+
+Native sample panels were checked in both appearances with zero, one and five
+sessions. The empty panel measured 691 points with feedback visible, and both
+populated panels kept the 760-point height. The full automated suite passed
+198 Swift, 11 CLI, five migration, five archive and two website checks.
+No new model turns or live notification-return trials were run for this update.
+The signed package has its own resource and archive receipt in the release assets.
+
 
 This is an explicit connected-workflow prerelease for native arm64 Codex
 0.169.0 / 0.170.0, with an ad-hoc signature. It is not complete P0 acceptance.

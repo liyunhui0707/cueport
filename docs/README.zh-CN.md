@@ -52,6 +52,12 @@ Dock可视／完整无障碍和界面矩阵未完成。两项 12 小时无模型
 [详细证据与限制](quality.md)。
 
 
+## Cueport 0.1.0-alpha.5
+
+空面板按内容确定高度，已有会话沿用分组布局。从已安装的 Cueport 复制命令，
+可以避免 Hook 继续依赖临时开发目录。命令出错时会显示实际调用的 CLI 名称。
+安装、更新和回退步骤见[安装指南](install.md)。
+
 ## Cueport 0.1.0-alpha.4
 
 Cueport 是 Agent Attention Router 的新名称。统一应用、菜单栏、原创标识、

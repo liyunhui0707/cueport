@@ -41,11 +41,11 @@ The app does not answer questions, grant approvals or send terminal input.
 Reviewed, answered, cancelled and unknown remain different states. Some Codex
 interaction lifecycles are unconfirmed; the app keeps that uncertainty visible.
 
-Cueport is the new name of Agent Attention Router. Alpha.4/build 4 unifies the
-app, CLI, icon, repository and website while retaining existing data and settings.
-Native notification acceptance is not repeated for this rename. Alpha.3 recorded
-five accurate returns and one safe refusal; Air/Dock and long-duration limits
-remain explicit. [Exact evidence and limits](docs/quality.md).
+Cueport was previously called Agent Attention Router. Alpha.5 sizes the empty
+panel to its contents, preserves the grouped session layout, and uses the CLI
+name you invoked in error messages. For existing Codex Hooks, use the helper in
+your installed Cueport application. See [installation](docs/install.md) and
+[release evidence](docs/quality.md).
 
 ## Requirements
 

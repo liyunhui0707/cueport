@@ -9,7 +9,7 @@ backend services are not bundled. Review [compatibility](compatibility.md).
 Download the exact selected release app archive and `SHA256SUMS` from the [Releases](https://github.com/liyunhui0707/cueport/releases). Verify the archive against that release's digest:
 
 ```sh
-shasum -a 256 Cueport-0.1.0-alpha.4-macos-arm64.zip
+shasum -a 256 Cueport-0.1.0-alpha.5-macos-arm64.zip
 ```
 
 Compare its complete result with the published checksum. A checksum establishes

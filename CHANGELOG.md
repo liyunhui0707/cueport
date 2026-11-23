@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.0-alpha.5
+
+- Fit an empty menu to its content. Preserve grouped sessions in populated menus.
+- Report CLI errors using the invoked name and document installed Hook helper paths.
+
 ## 0.1.0-alpha.2 — 2026-11-18
 
 - Bound terminal inventory/version subprocess output, timeout and child cleanup.

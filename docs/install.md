@@ -194,3 +194,17 @@ through the normal Codex Hook workflow. The tools do not rewrite Hook commands
 or trust settings. Custom Hook sources outside the default global hooks.json
 still require explicit review; never delete an old executable merely because
 its terminal windows are closed.
+
+## Names used by existing installations
+
+The daily application is `Cueport.app`. Use its packaged `Contents/MacOS/cueport`
+helper for new integrations. The `aar` executable remains available to existing
+scripts. Moving a source checkout while Codex Hooks point into its build folder
+can produce exit 127. Keep the old helper available during migration, back up the
+Hook configuration, replace only the owned executable paths, and review the new
+command through Codex's normal Hook trust flow.
+
+The historical bundle identifier, preference and protocol keys preserve existing
+settings and data. A separately installed Codex dependency may still live under
+`Application Support/AgentAttentionRouter`. Keep it while a selected executable
+uses that path. Earlier release assets keep their original filenames.

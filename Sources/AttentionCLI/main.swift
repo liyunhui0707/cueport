@@ -122,5 +122,6 @@ do {
 } catch {
     // A monitoring failure must never block, approve or deny a Codex action.
     if action == "hook" { exit(0) }
-    FileHandle.standardError.write(Data("aar: \(error.localizedDescription)\n".utf8)); exit(1)
+    let commandName = URL(fileURLWithPath: arguments[0]).lastPathComponent
+    FileHandle.standardError.write(Data("\(commandName): \(error.localizedDescription)\n".utf8)); exit(1)
 }

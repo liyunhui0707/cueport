@@ -2,6 +2,29 @@ import SwiftUI
 import AppKit
 import AttentionCore
 
+struct DashboardPopover: View {
+    @ObservedObject var model: RouterModel
+    let maximumHeight: CGFloat
+    let openSettings: () -> Void
+    let openDiagnostics: () -> Void
+    @State private var emptyHeight: CGFloat?
+
+    var body: some View {
+        let dashboard = DashboardView(model: model, openSettings: openSettings, openDiagnostics: openDiagnostics)
+        if model.overview.groups.isEmpty {
+            ScrollView {
+                dashboard.fixedSize(horizontal: false, vertical: true)
+                    .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { emptyHeight = ceil($0) }
+            }
+            .scrollBounceBehavior(.basedOnSize)
+            .frame(width: 400, height: min(emptyHeight ?? maximumHeight, maximumHeight), alignment: .top)
+            .background(Design.background)
+        } else {
+            dashboard.frame(height: maximumHeight)
+        }
+    }
+}
+
 struct DashboardView: View {
     @ObservedObject var model: RouterModel
     var openSettings: () -> Void = {}
@@ -43,7 +66,7 @@ struct DashboardView: View {
                     Rectangle().fill(Design.line).frame(width: 1, height: 27)
                     metric(value: overview.registeredSourceCount, title: "Sources", color: .primary)
                 }.padding(.vertical, 12).background(Design.card.opacity(0.65), in: RoundedRectangle(cornerRadius: 12))
-                Text("\(overview.registeredThreads.count) registered threads · Sources are recorded, not a live window count")
+                Text("\(overview.registeredThreads.count) registered \(overview.registeredThreads.count == 1 ? "thread" : "threads") · Sources count registered connections")
                     .font(.system(size: 10)).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
             }.padding(20)
             Rectangle().fill(Design.line).frame(height: 1)

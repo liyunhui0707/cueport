@@ -146,9 +146,9 @@ import Darwin
     }
     var routingNotice: String? {
         if demo { return nil }
-        if bridgePOC { return "Local bridge POC · Exact return uses each registered connection." }
+        if bridgePOC { return "Select a connected session to return to its original iTerm2 pane." }
         return originPOC == nil ? "Exact return is paused until terminal origin is verified." :
-            "Local POC · Exact return is limited to one verified comparison pane."
+            "Return is available for the verified test pane only."
     }
     var hasRoutingPOC: Bool { !demo && originPOC != nil }
 

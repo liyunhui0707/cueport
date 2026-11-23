@@ -13,7 +13,7 @@ Pass. See [current evidence](quality.md) and [historical alpha.2 evidence](quali
 | Recovery | Eight authenticated replacement attempts within120s per incident, stable60s resets budget, no task/approval replay. Peer, process birth, foreground TTY and exact unique terminal remain mandatory. |
 | Local notifications | Historical alpha.3: five accurate returns, one safe refusal. Alpha.4 native model trials not repeated; no thirty-success claim. |
 | Air notifications | Current-candidate native check incomplete after missing-backend repair. Historical alpha.1/alpha.2 checks are not current acceptance. |
-| Resource gate | Exact alpha.4 empty receiver:121samples/600.037s, peak78.891MiB, CPU0.04500%;12-hour observations incomplete. |
+| Resource gate | Exact alpha.4 empty receiver:121samples/600.037s, peak78.891MiB, CPU0.04500%. Separate alpha.3 12-hour results are in [quality evidence](quality.md). |
 | Native UI | Cueport Settings/version/menu and synthetic light/dark views checked; Dock/reopen and full current-release accessibility/Spaces matrices incomplete. |
 | Data/tools | Synthetic stopped-profile migration and recoverable unused-build cleanup checks pass; never overwrite a live/newer profile or restore stale data with app rollback. |
 | Signing | Ad-hoc only; no Developer ID/notarization or automatic app updater. |

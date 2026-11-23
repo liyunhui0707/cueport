@@ -37,8 +37,7 @@ timed out, so that UI-tool limitation is retained. Light/dark synthetic panels,
 Settings and the new icon were inspected. These are not model/notification trials.
 No further native model input was sent. Both daily application upgrades retain
 their prior preferences/current data; stopped-profile migration keeps originals.
-Full Dock, VoiceOver/Spaces/native-notification matrices and the12-hour soak remain
-separate/incomplete; incomplete evidence is never passed by waiver.
+Full Dock, VoiceOver, Spaces and native-notification coverage remains incomplete.
 
 ## Historical alpha.3 automated and package evidence
 
@@ -70,9 +69,11 @@ samples, with a 10-second warmup and 5-second sampling. Mean/max RSS was
 loaded UI, other hosts and longer durations are excluded from this measurement.
 Earlier memory failures are not deleted or reclassified.
 
-Two bounded 12-hour, zero-turn production-core transport soaks and a separate
-actual-candidate empty-receiver resource observation were started. They are
-**still running at publication preparation**, so no 12-hour pass is claimed.
+Both 12-hour transport runs completed with zero model turns. Native versions
+0.169 and 0.170 each recovered all 143 controlled disconnects, including one
+backend restart per run. The separate alpha.3 receiver recorded 1,441 RSS
+samples over 43,200 seconds, peaking at 79.969 MiB. Its popover was opened
+during the observation. These measurements apply to the observed builds.
 The transport harness uses synthetic terminal identity and owned empty native
 backends, with controlled proxy loss/backend restart; it does not establish
 real TUI identity, model continuity or notification return.

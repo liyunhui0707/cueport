@@ -95,6 +95,13 @@ struct AppMain {
             UNUserNotificationCenter.current().removeAllPendingNotificationRequests()
         }
         model.start()
+        if model.demo, CommandLine.arguments.contains("--record-popover-layout") {
+            popover.appearance = NSAppearance(named: CommandLine.arguments.contains("--sample-dark") ? .darkAqua : .aqua)
+            if CommandLine.arguments.contains("--sample-empty") { model.state = .init() }
+            if CommandLine.arguments.contains("--sample-one"), let id = model.state.sessions.keys.sorted().first {
+                model.state.sessions = model.state.sessions.filter { $0.key == id }
+            }
+        }
         if CommandLine.arguments.contains("--settings") { openWindow(settings: true) }
         else if CommandLine.arguments.contains("--show") {
             NSApp.activate(ignoringOtherApps: true)
@@ -140,10 +147,12 @@ struct AppMain {
             NSApp.activate(ignoringOtherApps: true)
             let available = (button.window?.screen ?? NSScreen.main)?.visibleFrame.height ?? 900
             let height = min(760, max(420, available - 48))
-            popover.contentViewController = NSHostingController(rootView:
-                DashboardView(model: model, openSettings: { self.openWindow(settings: true) }, openDiagnostics: { self.openWindow(settings: false) })
-                    .frame(height: height))
-            popover.contentSize = NSSize(width: 400, height: height)
+            let controller = NSHostingController(rootView: DashboardPopover(model: model,
+                maximumHeight: height, openSettings: { self.openWindow(settings: true) },
+                openDiagnostics: { self.openWindow(settings: false) }))
+            controller.sizingOptions = [.preferredContentSize]
+            if let appearance = popover.appearance { controller.view.appearance = appearance }
+            popover.contentViewController = controller
             popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
             if model.demo, CommandLine.arguments.contains("--record-popover-layout") {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
@@ -164,6 +173,7 @@ struct AppMain {
         do {
             try LocalStore.ensurePrivateDirectory(model.root)
             let result: [String: Any] = ["receiver_pid": getpid(), "native_popover_shown": popover.isShown,
+                "dark_appearance": view.effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua,
                 "application_active": NSApp.isActive,
                 "sample_sessions": model.sessions.count, "feedback_inserted_after_open": model.message != nil,
                 "content_height": popover.contentSize.height, "hosting_height": view.bounds.height,

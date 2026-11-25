@@ -138,7 +138,7 @@ struct DashboardView: View {
         }
     }
     func threadRow(_ session: AgentSession) -> some View {
-        SessionCard(session: session, busy: model.focusInProgress == session.id) { Task { await model.focus(session.id) } }
+        SessionCard(session: session, busy: model.focusInProgress == session.id, clearChecked: { model.clearCheckedReminders(session) }) { Task { await model.focus(session.id) } }
     }
     func banner(_ text: String, icon: String, color: Color) -> some View {
         HStack(alignment: .top, spacing: 8) { Image(systemName: icon).foregroundStyle(color); Text(text).fixedSize(horizontal: false, vertical: true); Spacer(minLength: 0) }
@@ -159,22 +159,23 @@ struct SessionCard: View {
     let session: AgentSession
     let busy: Bool
     var workerBuild: BridgeWorkerBuildStatus? = nil
+    var clearChecked: (() -> Void)? = nil
     var action: () -> Void
     @State private var hovering = false
     @FocusState private var keyboardFocused: Bool
-    var questions: [AttentionRequest] { session.outstanding.filter { $0.kind == .question } }
-    var approvals: [AttentionRequest] { session.outstanding.filter { $0.kind == .approval } }
-    var uncertain: Bool { session.outstanding.contains { $0.evidence == .unknown } }
-    var unconfirmed: Bool { session.outstanding.contains { $0.evidence != .confirmed } }
-    var color: Color { !session.queuedQuestions.isEmpty || session.protocolGapAt != nil || session.protocolCoverageNotice?.reviewed == false ? Design.amber : !approvals.isEmpty ? Design.purple : session.completionAt != nil && !session.completionReviewed ? Design.green : Design.blue }
-    var icon: String { !questions.isEmpty ? "questionmark.bubble" : !approvals.isEmpty ? "hand.raised" : session.protocolGapAt != nil || session.protocolCoverageNotice?.reviewed == false ? "exclamationmark.triangle" : session.completionAt != nil && !session.completionReviewed ? "checkmark" : session.execution == .interrupted ? "exclamationmark" : "terminal" }
+    var questions: [AttentionRequest] { session.visibleOutstanding.filter { $0.kind == .question } }
+    var approvals: [AttentionRequest] { session.visibleOutstanding.filter { $0.kind == .approval } }
+    var uncertain: Bool { session.visibleOutstanding.contains { $0.evidence == .unknown } }
+    var unconfirmed: Bool { session.visibleOutstanding.contains { $0.evidence != .confirmed } }
+    var color: Color { !session.queuedQuestions.isEmpty || session.protocolGapAt != nil || session.visibleCoverageNotice?.reviewed == false ? Design.amber : !approvals.isEmpty ? Design.purple : session.completionAt != nil && !session.completionReviewed ? Design.green : Design.blue }
+    var icon: String { !questions.isEmpty ? "questionmark.bubble" : !approvals.isEmpty ? "hand.raised" : session.protocolGapAt != nil || session.visibleCoverageNotice?.reviewed == false ? "exclamationmark.triangle" : session.completionAt != nil && !session.completionReviewed ? "checkmark" : session.execution == .interrupted ? "exclamationmark" : "terminal" }
     var title: String {
         if !session.queuedQuestions.isEmpty { return "\(session.queuedQuestions.count) question\(session.queuedQuestions.count == 1 ? "" : "s") queued" }
         if !session.submittedQuestions.isEmpty { return "\(session.submittedQuestions.count) answer\(session.submittedQuestions.count == 1 ? "" : "s") submitted · Unconfirmed" }
         if !session.uncertainQuestions.isEmpty { return "\(session.uncertainQuestions.count) question\(session.uncertainQuestions.count == 1 ? "" : "s") · Status unconfirmed" }
         if !approvals.isEmpty { return approvals.contains { $0.evidence == .confirmed } ? "Waiting for your approval" : uncertain ? "Approval state unconfirmed" : "Approval request observed" }
         if session.protocolGapAt != nil { return "Check the original session" }
-        if session.protocolCoverageNotice?.reviewed == false { return "Interaction coverage needs a check" }
+        if session.visibleCoverageNotice?.reviewed == false { return "Interaction coverage needs a check" }
         if session.completionAt != nil && !session.completionReviewed { return "Turn stopped · Unreviewed" }
         switch session.execution {
         case .running: return "Working independently"
@@ -185,6 +186,17 @@ struct SessionCard: View {
         }
     }
     var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            routeButton
+            if let clearChecked, !session.uncertainQuestions.isEmpty || session.visibleCoverageNotice != nil {
+                Button("已核对，清除此提醒", action: clearChecked)
+                    .controlSize(.small)
+                    .disabled(busy)
+                    .accessibilityHint("Clears the checked reminders for this session.")
+            }
+        }
+    }
+    private var routeButton: some View {
         Button(action: action) {
             HStack(alignment: .top, spacing: 10) {
                 Image(systemName: icon).font(.system(size: 14, weight: .medium)).foregroundStyle(color).frame(width: 31, height: 31).background(color.opacity(0.10), in: RoundedRectangle(cornerRadius: 9))
@@ -201,7 +213,7 @@ struct SessionCard: View {
                         Text("Monitoring missed an event. Pending requests may need a check.")
                             .font(.system(size: 10)).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
                     }
-                    if let notice = session.protocolCoverageNotice {
+                    if let notice = session.visibleCoverageNotice {
                         Text(notice.issue.explanation).font(.system(size: 10)).foregroundStyle(Design.amber)
                             .fixedSize(horizontal: false, vertical: true)
                         Text(notice.reviewed ? "Coverage notice reviewed · Coverage unconfirmed" : "Coverage notice · Check Codex")
@@ -234,6 +246,6 @@ struct SessionCard: View {
             .help(session.project + "\n" + (workerBuild?.detail ?? "Open the exact original terminal session"))
             .accessibilityLabel("\(session.project), Codex, \(title), \(session.execution.rawValue), \(approvals.count) approval requests, \(session.submittedQuestions.count) answers submitted but unconfirmed, \(session.uncertainQuestions.count) other question states unconfirmed. \(session.completionAt != nil && !session.completionReviewed ? "Unreviewed stopped turn." : "") \(workerBuild?.summary ?? "")")
             .accessibilityValue(busy ? "Opening original terminal" : "")
-            .accessibilityHint("Opens the original iTerm2 pane. Does not answer or approve requests. \(session.protocolCoverageNotice?.detail ?? "")")
+            .accessibilityHint("Opens the original iTerm2 pane. Does not answer or approve requests. \(session.visibleCoverageNotice?.detail ?? "")")
     }
 }

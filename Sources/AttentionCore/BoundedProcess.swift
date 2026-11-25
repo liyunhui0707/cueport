@@ -10,12 +10,14 @@ public enum BoundedProcess {
     }
     public static func output(_ executable: URL, arguments: [String] = [],
                               environment: [String: String]? = nil,
+                              workingDirectory: URL? = nil,
                               timeout: TimeInterval = 5, maximumBytes: Int = 1_048_576) throws -> Data {
         guard timeout.isFinite, timeout > 0, timeout <= 120,
               maximumBytes > 0, maximumBytes <= 1_048_576 else { throw Failure.invalidLimits }
         let child = Process(), pipe = Pipe()
         child.executableURL = executable; child.arguments = arguments
         child.environment = environment
+        child.currentDirectoryURL = workingDirectory
         child.standardInput = FileHandle.nullDevice; child.standardError = FileHandle.nullDevice
         child.standardOutput = pipe
         try child.run()

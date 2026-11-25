@@ -44,6 +44,15 @@ final class ProcessOriginTests: XCTestCase {
         XCTAssertThrowsError(try ProcessOriginVerifier.revalidate(origin, live: hint(),
             sessions: [replacement], devices: ["/dev/ttys001": 42], currentUID: 501))
     }
+    func testMovingSplitPanePreservesOriginAndClosingItRefusesNeighbor() throws {
+        let origin = try resolve(hint(), hint())
+        let moved = TerminalSession(id: guid, windowID: "new-window", tabID: "new-tab", tty: "/dev/ttys001")
+        let neighbor = TerminalSession(id: "AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA", windowID: "w", tabID: "t", tty: "/dev/ttys002")
+        let devices: [String: UInt32] = ["/dev/ttys001": 42, "/dev/ttys002": 43]
+        let target = try ProcessOriginVerifier.revalidate(origin, live: hint(), sessions: [neighbor, moved], devices: devices, currentUID: 501)
+        XCTAssertEqual(target, moved)
+        XCTAssertThrowsError(try ProcessOriginVerifier.revalidate(origin, live: hint(), sessions: [neighbor], devices: devices, currentUID: 501))
+    }
     func testOldNotificationProcessReferenceDoesNotFollowPIDReuse() {
         XCTAssertEqual(hint().instanceID, hint().instanceID)
         XCTAssertNotEqual(hint().instanceID, hint(start: 124).instanceID)

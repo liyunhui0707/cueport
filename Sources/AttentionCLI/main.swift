@@ -94,12 +94,18 @@ do {
         for session in state.sortedSessions { print("\(session.project) · \(session.execution.rawValue) · \(session.outstanding.count) requests") }
     case "doctor":
         print("Cueport · local diagnostics")
+        let hooks = option("--hooks-file").map { URL(fileURLWithPath: $0) } ?? ConnectionDiagnostics.defaultHooks
+        print("Hooks: " + ConnectionDiagnostics.hooks(at: hooks))
+        print("Last transport end in this data folder: " + ConnectionDiagnostics.lastTransport(in: root))
+        if arguments.contains("--check-backend") {
+            print("Backend: " + ConnectionDiagnostics.checkBackend(option("--native-codex") ?? NativeCodex.defaultPath))
+        }
         print("Loaded helper build: \(MachOBuildIdentity.loadedUUID() ?? "unverified")")
         print("OS: \(ProcessInfo.processInfo.operatingSystemVersionString)")
         print("iTerm2: \(FileManager.default.fileExists(atPath: "/Applications/iTerm.app") ? "installed" : "not found in /Applications")")
         print("Terminal identity: \(ProcessInfo.processInfo.environment["ITERM_SESSION_ID"].flatMap { TerminalIdentity(sessionID: $0).guid } == nil ? "not present in this process" : "valid")")
         print("Data directory: \(root.path)")
-        print("No credentials, prompts, terminal contents or config values are included.")
+        print("Only diagnostic metadata and recognized helper paths are shown.")
     default:
         print("""
         Cueport — Never miss an agent that needs you.
@@ -109,7 +115,8 @@ do {
           --executable /absolute/cueport      Stable helper path (use the same path to uninstall)
           --hooks-file /path/hooks.json   Override destination for isolated testing
           --data-dir /private/directory   Override private local storage
-        cueport doctor                       Print content-free environment diagnostics
+        cueport doctor [--hooks-file PATH]   Inspect local paths and the last transport end
+          --check-backend [--native-codex PATH]  Also ask the selected native backend for its version
         cueport check-bridge-dependencies    Check exact native dependency version; no session/model task
         cueport status                       Read the persisted state
         cueport codex --data-dir PATH --     Connected native TUI (Codex \(BridgeCompatibility.supportedDescription))

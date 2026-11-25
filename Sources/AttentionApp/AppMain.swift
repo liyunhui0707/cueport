@@ -66,11 +66,7 @@ struct AppMain {
         statusItem.button?.image = indicator
         statusItem.button?.target = self; statusItem.button?.action = #selector(toggle)
         statusItem.button?.toolTip = review || validationLabel ? "Cueport — Test build (isolated data)" : "Cueport — Daily application"
-        model.onCountChanged = { [weak self] count in
-            guard let self else { return }
-            let title = (self.review || self.validationLabel ? " TEST" : "") + (count == 0 ? "" : " \(count)")
-            if self.statusItem.button?.title != title { self.statusItem.button?.title = title }
-        }
+        statusItem.button?.title = review || validationLabel ? " TEST" : ""
         model.onNotify = { [weak self] event, session in
             if event.kind == .approvalRequested && event.protocolBinding != nil {
                 // Coalesce quick automatic resolution; elapsed time never upgrades
@@ -103,7 +99,7 @@ struct AppMain {
             }
         }
         if CommandLine.arguments.contains("--settings") { openWindow(settings: true) }
-        else if CommandLine.arguments.contains("--show") {
+        if CommandLine.arguments.contains("--show") && (model.demo || !CommandLine.arguments.contains("--settings")) {
             NSApp.activate(ignoringOtherApps: true)
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { self.toggle() }
         }
@@ -111,6 +107,11 @@ struct AppMain {
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
         if !flag && !popover.isShown { toggle() }
         return true
+    }
+    func applicationDidResignActive(_ notification: Notification) {
+        // Settings can be the key window while the status-item popover is open.
+        // In that case the transient popover may outlive the app's activation.
+        if popover.isShown { popover.close() }
     }
     func applicationDockMenu(_ sender: NSApplication) -> NSMenu? {
         let menu = NSMenu()
@@ -220,7 +221,7 @@ struct AppMain {
         case .interrupted: content.body = "Turn interrupted. Check the original terminal."
         default: model.completeNotification(plan, accepted: false); return
         }
-        content.userInfo = ["sessionID": session.id, "sourceInstance": plan.sourceInstance]
+        content.userInfo = ["sessionID": session.id, "sourceInstance": plan.sourceInstance, "reviewKeys": plan.reviewKeys]
         content.threadIdentifier = session.id
         if model.soundEnabled { content.sound = .default }
         // Native notifications carry only an opaque session reference, never executable text.
@@ -281,6 +282,7 @@ struct AppMain {
         let callbackStarted = DispatchTime.now().uptimeNanoseconds
         let id = response.notification.request.content.userInfo["sessionID"] as? String
         let instance = response.notification.request.content.userInfo["sourceInstance"] as? String
+        let reviewKeys = response.notification.request.content.userInfo["reviewKeys"] as? [String] ?? []
         let deliveryTest = response.notification.request.content.userInfo["deliveryTest"] as? Bool ?? false
         if response.actionIdentifier == UNNotificationDefaultActionIdentifier, deliveryTest {
             Task { @MainActor in
@@ -290,7 +292,7 @@ struct AppMain {
             }
         } else if response.actionIdentifier == UNNotificationDefaultActionIdentifier, let id {
             Task { @MainActor in
-                await model.focusNotification(id, instance: instance, callbackStarted: callbackStarted)
+                await model.focusNotification(id, instance: instance, reviewKeys: reviewKeys, callbackStarted: callbackStarted)
                 // A closed/ambiguous target needs visible feedback even when
                 // no Settings window or menu panel was already open.
                 if model.message != nil && !popover.isShown { toggle() }

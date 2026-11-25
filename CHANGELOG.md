@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.0-alpha.8
+
+- Keep the menu bar icon compact and let users clear a batch of unconfirmed reminders after checking the original session.
+- Close the popover when switching to another app.
+- Follow the installed native Codex and check the protocol on newer stable releases.
+
 ## 0.1.0-alpha.5
 
 - Fit an empty menu to its content. Preserve grouped sessions in populated menus.

@@ -3,15 +3,26 @@ import Darwin
 
 /// A user-selected dependency, never an event-supplied command or PATH lookup.
 public enum NativeCodex {
-    public static let defaultPath = "/opt/homebrew/lib/node_modules/@openai/codex/node_modules/@openai/codex-darwin-arm64/vendor/aarch64-apple-darwin/bin/codex"
+    // A stable launcher points at the current Homebrew cask after upgrades.
+    // For npm use the package's native binary directly, preserving the TUI PID.
+    public static var defaultPath: String {
+        let launcher = URL(fileURLWithPath: "/opt/homebrew/bin/codex")
+        if launcher.resolvingSymlinksInPath().path.hasPrefix("/opt/homebrew/Caskroom/codex/") {
+            return launcher.path
+        }
+        return npmNativePath
+    }
+    private static let npmNativePath = "/opt/homebrew/lib/node_modules/@openai/codex/node_modules/@openai/codex-darwin-arm64/vendor/aarch64-apple-darwin/bin/codex"
     public enum Failure: LocalizedError, Equatable, Sendable {
         case invalidPath, unavailable, nativeRequired, unsupportedVersion, probeFailed
+        case incompatibleProtocol(String)
         public var errorDescription: String? {
             switch self {
             case .invalidPath: "Choose an absolute path to the native executable named codex."
             case .unavailable: "The selected Codex file is missing, inaccessible or not executable. Choose it again or use the default."
             case .nativeRequired: "Choose the native arm64 Codex binary named codex. Shell/npm wrappers and non-regular files are not accepted."
-            case .unsupportedVersion: "Supported native Codex versions: \(BridgeCompatibility.supportedDescription). Other versions are not enabled."
+            case .unsupportedVersion: "Supported native Codex versions: \(BridgeCompatibility.supportedDescription)."
+            case .incompatibleProtocol(let actual): "Codex \(actual) did not pass the bridge protocol check. Update Cueport or choose a compatible native file in Settings."
             case .probeFailed: "The native version check failed or exceeded 30 seconds. Review the selected installation and retry."
             }
         }
@@ -40,7 +51,11 @@ public enum NativeCodex {
         let output: Data
         do { output = try BoundedProcess.output(URL(fileURLWithPath: path), arguments: ["--version"], timeout: 30, maximumBytes: 4096) }
         catch { throw Failure.probeFailed }
-        guard let version = BridgeCompatibility.nativeVersion(in: output) else { throw Failure.unsupportedVersion }
+        if let baseline = BridgeCompatibility.nativeVersion(in: output) { return baseline }
+        guard let version = BridgeCompatibility.reportedVersion(in: output),
+              BridgeCompatibility.eligibleVersion(version) else { throw Failure.unsupportedVersion }
+        do { try NativeProtocolCheck.check(URL(fileURLWithPath: path)) }
+        catch { throw Failure.incompatibleProtocol(version) }
         return version
     }
 }

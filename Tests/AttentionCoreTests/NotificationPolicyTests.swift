@@ -7,6 +7,36 @@ final class NotificationPolicyTests: XCTestCase {
     func question(_ ids: [String] = ["q1", "q2"]) -> AgentEvent {
         AgentEvent(kind: .questionQueued, sessionID: "s", turnID: "turn", questionIDs: ids, timestamp: now)
     }
+    func testOldBannerReviewsOnlyTheAdvertisedRequestRevision() throws {
+        var state = RouterState()
+        let first = question(["first"])
+        try state.apply(first)
+        let plan = try XCTUnwrap(NotificationPolicy.plan(event: first, session: state.sessions["s"]!, sourceInstance: instance, submitted: [:], now: now))
+        try state.apply(question(["second"]))
+        state = try JSONDecoder().decode(RouterState.self, from: JSONEncoder().encode(state))
+        state.reviewNotification("s", keys: []) // Pre-upgrade banner
+        XCTAssertEqual(state.sessions["s"]?.requests["first"]?.reviewed, false)
+        state.reviewNotification("s", keys: plan.reviewKeys)
+        XCTAssertEqual(state.sessions["s"]?.requests["first"]?.reviewed, true)
+        XCTAssertEqual(state.sessions["s"]?.requests["second"]?.reviewed, false)
+        XCTAssertEqual(state.sessions["s"]?.requests["first"]?.evidence, .observed)
+        state.sessions["s"]?.requests["first"]?.updatedAt = now.addingTimeInterval(1)
+        state.sessions["s"]?.requests["first"]?.reviewed = false
+        state.reviewNotification("s", keys: plan.reviewKeys)
+        XCTAssertEqual(state.sessions["s"]?.requests["first"]?.reviewed, false)
+    }
+    func testOldCompletionBannerCannotReviewANewerTurn() throws {
+        var state = RouterState()
+        let stop = AgentEvent(kind: .turnStopped, sessionID: "s", turnID: "a", timestamp: now)
+        try state.apply(stop)
+        let plan = try XCTUnwrap(NotificationPolicy.plan(event: stop, session: state.sessions["s"]!, sourceInstance: instance, submitted: [:], now: now))
+        state.reviewNotification("s", keys: plan.reviewKeys)
+        XCTAssertEqual(state.sessions["s"]?.completionReviewed, true)
+        try state.apply(AgentEvent(kind: .turnStopped, sessionID: "s", turnID: "b", timestamp: now))
+        XCTAssertNil(NotificationPolicy.plan(event: stop, session: state.sessions["s"]!, sourceInstance: instance, submitted: [:], now: now))
+        state.reviewNotification("s", keys: plan.reviewKeys)
+        XCTAssertEqual(state.sessions["s"]?.completionReviewed, false)
+    }
     func testRunningQuestionsNotifyOnceAndPartialReplayOnlyCountsNewQuestions() throws {
         var state = RouterState()
         try state.apply(AgentEvent(kind: .inputSubmitted, sessionID: "s", timestamp: now))

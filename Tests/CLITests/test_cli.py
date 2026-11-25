@@ -24,6 +24,19 @@ class CLITests(unittest.TestCase):
     def command(self, *args, payload=None):
         return subprocess.run([str(CLI), *args], input=payload, env=self.env, capture_output=True, check=True)
 
+    def test_doctor_uses_explicit_files_without_modifying_them(self):
+        hooks = self.root / "hooks.json"
+        missing = self.root / "old build" / "aar"
+        config = {"hooks": {"Stop": [{"hooks": [{"type": "command", "command": f"'{missing}' hook"},
+                                                {"type": "command", "command": "private-foreign-command"}]}]}}
+        hooks.write_text(json.dumps(config)); hooks.chmod(0o600)
+        data = self.root / "absent-data"
+        result = self.command("doctor", "--hooks-file", str(hooks), "--data-dir", str(data))
+        self.assertIn(b"Hook helper unavailable", result.stdout)
+        self.assertNotIn(b"private-foreign-command", result.stdout)
+        self.assertFalse(data.exists())
+        self.assertEqual(json.loads(hooks.read_text()), config)
+
     def test_dependency_probe_rejects_wrappers_and_fifos_without_running_them(self):
         for kind in ["script", "fifo"]:
             directory = self.root / kind

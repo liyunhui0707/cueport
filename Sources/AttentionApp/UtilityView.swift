@@ -5,6 +5,11 @@ import AttentionCore
 struct UtilityView: View {
     @ObservedObject var model: RouterModel
     let settings: Bool
+    @State private var hookStatus = "Choose Check connection to inspect default Hook paths."
+    @State private var transportStatus = "No check requested."
+    @State private var backendResult: (path: String, status: String)?
+    @State private var checkingBackend = false
+    @State private var checkingConnection = false
     var body: some View {
         ScrollView {
         VStack(alignment: .leading, spacing: 22) {
@@ -160,13 +165,13 @@ struct UtilityView: View {
             }
             HStack {
                 Button("Choose native file…") { model.chooseNativeCodex() }.controlSize(.small)
-                Button("Use default") { model.useDefaultNativeCodex() }.controlSize(.small)
+                Button("Follow installed Codex") { model.useDefaultNativeCodex() }.controlSize(.small)
                     .disabled(model.chosenNativeCodex == nil && !model.nativeChoiceUnavailable)
                 Button("Check file/version") { model.checkNativeCodex() }.controlSize(.small)
                     .disabled(model.nativeChoiceUnavailable)
                 if model.checkingNativeCodex { ProgressView().controlSize(.small) }
             }.disabled(model.demo || model.checkingNativeCodex)
-            Text("Supported native arm64 Codex: \(BridgeCompatibility.supportedDescription). This changes future copied launch/resume commands; open sessions keep running. It does not install dependencies, edit Codex settings or start its backend.")
+            Text("Follow installed Codex uses the current Homebrew or npm installation for each new connection. Newer stable versions are checked for bridge compatibility. Choosing a file pins the copied commands to that path.")
                 .font(.system(size: 10)).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
             Text(model.demo ? "Sample preference scope" : model.nativeChoiceScopeDescription)
                 .font(.system(size: 10)).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
@@ -174,6 +179,39 @@ struct UtilityView: View {
     }
     var diagnosticsContent: some View {
         VStack(alignment: .leading, spacing: 18) {
+            group("CONNECTION AND RECOVERY") {
+                VStack(alignment: .leading, spacing: 12) {
+                    diagnostic("Connection mode", value: model.currentModeDescription, icon: "terminal")
+                    if model.bridgePOC {
+                        diagnostic("Registered sources", value: "\(model.overview.registeredSourceCount) recorded. Open the matching project card to check its connection.", icon: "square.stack")
+                    }
+                    diagnostic("Native dependency", value: model.nativeCodexStatus, icon: "shippingbox")
+                    diagnostic("Backend version", value: backendResult?.path == model.nativeCodexPath ? backendResult?.status ?? "Not checked" : "Not checked for this file", icon: "server.rack")
+                    Button(checkingBackend ? "Checking backend…" : "Check backend version") {
+                        guard let path = model.nativeCodexPath else { return }
+                        checkingBackend = true
+                        Task {
+                            let status = await Task.detached { ConnectionDiagnostics.checkBackend(path) }.value
+                            backendResult = (path, status)
+                            checkingBackend = false
+                        }
+                    }.controlSize(.small).disabled(model.demo || model.startupBlocked || checkingBackend || model.nativeCodexPath == nil)
+                     .help("Ask the selected native Codex for its daemon version. This starts no task or backend service.")
+                    diagnostic("Default Codex Hooks", value: hookStatus, icon: "link")
+                    diagnostic("Last transport end · All connections in this folder", value: transportStatus, icon: "clock")
+                    if let notice = model.connectionRecoveryNotice {
+                        Text(notice).font(.caption).fixedSize(horizontal: false, vertical: true)
+                    }
+                    HStack {
+                        Button("Check connection") { checkConnection() }
+                            .disabled(model.demo || model.startupBlocked || checkingConnection || model.checkingNativeCodex)
+                        if model.bridgePOC {
+                            Button("Copy resume command") { copyCommand(resume: true) }
+                                .disabled(model.demo || model.startupBlocked || !model.canCopyNativeCommands)
+                        }
+                    }.controlSize(.small)
+                }
+            }
             retainedRecordsContent
             group("THIS RECEIVER") {
                 VStack(spacing: 14) {
@@ -183,6 +221,10 @@ struct UtilityView: View {
                     Divider()
                     diagnostic("Pending reminders", value: model.queueDescription, icon: "clock.arrow.circlepath")
                     Divider()
+                    if let last = model.state.routingAttempts?.last(where: { $0.notificationClick }) {
+                        diagnostic("Last notification return", value: last.timestamp.formatted() + " · " + last.outcomeDescription, icon: "arrowshape.turn.up.left")
+                        Divider()
+                    }
                     diagnostic("Verified return timing", value: model.returnTimingDescription, icon: "stopwatch")
                     Divider()
                     diagnostic("Reminder submission timing", value: model.submissionTimingDescription, icon: "timer")
@@ -226,6 +268,20 @@ struct UtilityView: View {
                     Button("Refresh diagnostics") { model.refreshDiagnostics(); model.refreshAuthorization() }.controlSize(.small).padding(.top, 2)
                 }
             }
+        }
+    }
+    private func checkConnection() {
+        checkingConnection = true
+        model.refreshDiagnostics()
+        model.checkNativeCodex()
+        let root = model.root
+        Task {
+            let (hooks, transport) = await Task.detached {
+                (ConnectionDiagnostics.hooks(), ConnectionDiagnostics.lastTransport(in: root))
+            }.value
+            hookStatus = hooks
+            transportStatus = transport
+            checkingConnection = false
         }
     }
     private func statusMeaning(_ title: String, _ explanation: String) -> some View {

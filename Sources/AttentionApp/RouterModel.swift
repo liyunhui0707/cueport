@@ -33,7 +33,7 @@ import Darwin
     }
     var onDockVisibilityChanged: ((Bool) -> Void)?
     let demo: Bool
-    var onCountChanged: ((Int) -> Void)?
+    private var visitedReminderSnapshots: [String: CheckedReminderBatch] = [:]
     var onNotify: ((AgentEvent, AgentSession) -> Void)?
     var storage: LocalStore?
     var consumerLock: FileHandle?
@@ -113,7 +113,19 @@ import Darwin
             objectWillChange.send()
         }
         registeredProcesses = inspected
-        onCountChanged?(attentionCount)
+    }
+    func clearCheckedReminders(_ displayed: AgentSession) {
+        var next = state
+        next.clearCheckedReminders(from: visitedReminderSnapshots[displayed.id] ?? CheckedReminderBatch(displayed))
+        do {
+            if !demo {
+                guard let storage else { throw RouterError.unsafeStorage }
+                try storage.save(next)
+            }
+            state = next
+            visitedReminderSnapshots.removeValue(forKey: displayed.id)
+            refreshDiagnostics()
+        } catch { message = "Could not save your reminder check. Please try again." }
     }
     func setArchived(_ id: String, archived: Bool) {
         var next = state
@@ -128,7 +140,6 @@ import Darwin
             }
             state = next
             message = archived ? "Archived from the list. Requests are unchanged; new activity needing review restores the entry." : "Record restored. Closed sources remain hidden from the main list; request states are unchanged."
-            onCountChanged?(attentionCount)
             refreshDiagnostics()
         } catch { message = "The list change could not be saved. Your sessions are unchanged." }
     }
@@ -191,12 +202,12 @@ import Darwin
     func useDefaultNativeCodex() {
         guard !demo, !checkingNativeCodex else { return }
         chosenNativeCodex = nil; nativeChoiceUnavailable = false; nativeCheckFailed = false
-        nativeCodexStatus = "Default file selected · Each launch still checks the native version"
+        nativeCodexStatus = "Following installed Codex · New connections check compatibility at launch"
         if canSaveNativeChoice { UserDefaults.standard.removeObject(forKey: NativeCodexPreference.defaultsKey) }
     }
     private func verifyNativeCodex(_ path: String, saveChoice: Bool) {
         guard !demo, !checkingNativeCodex else { return }
-        checkingNativeCodex = true; nativeCodexStatus = "Checking native file/version · Up to 30 seconds"
+        checkingNativeCodex = true; nativeCodexStatus = "Checking native file and bridge compatibility…"
         Task { [weak self] in
             let result = await Task.detached {
                 do { return (version: try NativeCodex.verifyVersion(path), failure: nil as String?) }
@@ -218,11 +229,11 @@ import Darwin
                 } catch { self.nativeCodexStatus = "The selected native file choice could not be saved."; return }
             }
             self.nativeCheckFailed = false
-            self.nativeCodexStatus = "Native Codex \(result.version) verified · Backend, login and iTerm API access are checked separately"
+            self.nativeCodexStatus = "Native Codex \(result.version) verified · \(CodexInstallation(nativeExecutable: path).updateSummary). Backend reachability is untested."
         }
     }
     func start() {
-        if demo { onCountChanged?(attentionCount); return }
+        if demo { return }
         if startupBlocked { monitoringHealth = .unavailable; return }
         do {
             if let restored = startupSelection.restored { _ = try restored.validatedRoot() }
@@ -333,20 +344,19 @@ import Darwin
             } else if result.rejected > 0 {
                 message = "\(result.rejected) invalid or unsupported event files were ignored. Valid sessions are still monitored."
             }
-            onCountChanged?(attentionCount)
             return true
         } catch { monitoringHealth = .processingFailed; message = "An event could not be processed: \(error.localizedDescription)"; return false }
     }
     func focus(_ id: String) async {
         await performFocus(id, requiredInstance: nil, action: "menu_selection")
     }
-    func focusNotification(_ id: String, instance: String?, callbackStarted: UInt64? = nil) async {
+    func focusNotification(_ id: String, instance: String?, reviewKeys: [String] = [], callbackStarted: UInt64? = nil) async {
         guard let instance else {
             recordRoute(id, requested: nil, notification: true, outcome: .missingReference)
             message = "This notification has no verified original process. Your attention list is preserved."
             return
         }
-        await performFocus(id, requiredInstance: instance, action: "native_notification_click", callbackStarted: callbackStarted)
+        await performFocus(id, requiredInstance: instance, action: "native_notification_click", reviewKeys: reviewKeys, callbackStarted: callbackStarted)
     }
     private func recordRoute(_ id: String, requested: String?, notification: Bool, outcome: RoutingAttempt.Outcome, elapsedMilliseconds: Double? = nil) {
         guard !demo else { return }
@@ -517,7 +527,7 @@ import Darwin
         case .unavailable: return "Monitoring could not start"
         }
     }
-    private func performFocus(_ id: String, requiredInstance: String?, action: String, callbackStarted: UInt64? = nil) async {
+    private func performFocus(_ id: String, requiredInstance: String?, action: String, reviewKeys: [String] = [], callbackStarted: UInt64? = nil) async {
         let routeStarted = min(callbackStarted ?? DispatchTime.now().uptimeNanoseconds, DispatchTime.now().uptimeNanoseconds)
         var outcome: RoutingAttempt.Outcome = .refused
         defer { recordRoute(id, requested: requiredInstance, notification: action == "native_notification_click", outcome: outcome,
@@ -533,6 +543,9 @@ import Darwin
         let isAuthorized: () -> Bool
         if bridgePOC {
             guard let binding = try? ProtocolRoute.authorize(session, reference: requiredInstance) else {
+                if let requiredInstance, let current = session.verifiedProtocolBinding, requiredInstance != current.reference {
+                    outcome = .sourceChanged
+                }
                 message = "This source is disconnected, shared by multiple clients, or belongs to an older connection. No terminal was selected."
                 return
             }
@@ -564,10 +577,15 @@ import Darwin
             // Raw environment GUIDs never authorize or replace this pinned binding.
             try await ITermAdapter.focus(origin, revealIdentity: revealIdentity, isAuthorized: isAuthorized)
             guard isAuthorized() else { throw RouterError.unverifiedOrigin }
-            state.markReviewed(id); try storage?.save(state); message = nil
+            visitedReminderSnapshots[id] = CheckedReminderBatch(session)
+            if requiredInstance != nil {
+                state.reviewNotification(id, keys: reviewKeys)
+            } else {
+                state.markReviewed(id, asSeen: session)
+            }
+            try storage?.save(state); message = nil
             outcome = .dispatched
             originPOC?.record(action: action, success: true, milliseconds: Date().timeIntervalSince(started) * 1000)
-            onCountChanged?(attentionCount)
         } catch {
             outcome = (error as? RouterError) == .unverifiedOrigin ? .sourceChanged : .dispatchFailed
             message = error.localizedDescription

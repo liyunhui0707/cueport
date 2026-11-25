@@ -20,6 +20,8 @@ screenshot of accepted live monitoring.
 
 ## What it does
 
+The menu bar shows the Cueport icon. Open it to see the **To review** count. After checking the original session, select **已核对，清除此提醒** on its card to dismiss the displayed unconfirmed questions and coverage warning. New requests and pending approvals remain visible.
+
 - Groups registered project sources and keeps execution independent of questions
   and approvals. An agent can work while several questions remain outstanding.
 - Shows open registered sources on the main panel. Exited/closed sources leave
@@ -53,7 +55,7 @@ your installed Cueport application. See [installation](docs/install.md) and
 | --- | --- |
 | Mac | Apple Silicon; tested on macOS 27.2.1 |
 | iTerm2 | 3.7.7 at `/Applications/iTerm.app`; normal Python API permission required |
-| Codex | Native arm64 **0.169.0 / 0.170.0**, separately installed and initialized |
+| Codex | Native arm64 **0.169.0 / 0.170.0**, plus later stable versions that pass the protocol check. The 0.172.0 handshake was verified. [Following upgrades](docs/install.md#external-prerequisites) |
 | Native backend | A working official Codex backend and normal login/network prerequisites |
 | App signing | Local ad-hoc signature; no Developer ID or notarization |
 

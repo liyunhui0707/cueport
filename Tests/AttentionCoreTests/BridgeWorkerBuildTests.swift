@@ -96,7 +96,9 @@ final class BridgeWorkerBuildTests: XCTestCase {
         let decoded = try JSONDecoder().decode(RouterState.self, from: JSONEncoder().encode(state))
         XCTAssertEqual(health(decoded).nativeVersion, "0.170.0")
         XCTAssertTrue(health(decoded).detail.contains("Running native Codex · 0.170.0"))
-        var invalid = registration(current); invalid.nativeClientVersion = "0.171.0"
+        var invalid = registration(current); invalid.nativeClientVersion = "0.172.0"
+        XCTAssertNoThrow(try invalid.validate())
+        invalid.nativeClientVersion = "0.168.0"
         XCTAssertThrowsError(try invalid.validate())
         invalid.nativeClientVersion = "0.170.0"; invalid.source = "codex-hook"
         XCTAssertThrowsError(try invalid.validate())

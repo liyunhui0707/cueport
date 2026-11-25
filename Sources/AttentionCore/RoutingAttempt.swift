@@ -5,6 +5,15 @@ public struct RoutingAttempt: Codable, Equatable, Sendable {
     public enum Outcome: String, Codable, Sendable {
         case missingReference, refused, sourceChanged, dispatchFailed, dispatched
     }
+    public var outcomeDescription: String {
+        switch outcome {
+        case .missingReference: "The reminder had no original terminal reference."
+        case .refused: "Return refused. Check that the original pane is open and uniquely connected."
+        case .sourceChanged: "The original source could no longer be verified."
+        case .dispatchFailed: "The terminal return could not be completed and verified."
+        case .dispatched: "Verified return to the original pane."
+        }
+    }
     public let timestamp: Date
     public let sessionKey: String
     public let displayReference: String

@@ -18,6 +18,7 @@ public struct ProtocolCoverageNotice: Codable, Equatable, Sendable {
     public let id: String
     public let issue: ProtocolCoverageIssue
     public let observedAt: Date
+    public var manuallyCheckedAt: Date?
     public var reviewed: Bool
     public init(id: String, issue: ProtocolCoverageIssue, observedAt: Date, reviewed: Bool = false) {
         self.id = id; self.issue = issue; self.observedAt = observedAt; self.reviewed = reviewed

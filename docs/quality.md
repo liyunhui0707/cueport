@@ -1,5 +1,19 @@
 # Cueport release evidence
 
+## Alpha.8 / build 8
+
+The status item shows the Cueport icon only. Open the panel for the review count.
+After checking a session in iTerm2, use **已核对，清除此提醒** to dismiss those
+unconfirmed reminders. The choice survives restart. New questions, approvals
+and later coverage warnings remain visible.
+
+The release source passed 209 Swift tests, 12 CLI tests, five migration tests,
+five archive tests and two website tests. Light and dark synthetic panels
+covered 17 unconfirmed questions before and after a manual check. The signed
+ZIP passed extraction, helper execution, installation, update and rollback
+checks. The artifact receipt records the package's resource measurements.
+No live model, Air, Spaces or VoiceOver trials were run for this build.
+
 ## Alpha.5 / build 5
 
 Native sample panels were checked in both appearances with zero, one and five

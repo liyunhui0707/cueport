@@ -104,6 +104,7 @@ public struct RouterState: Codable, Equatable, Sendable {
                 if kind == .question, old.answerSubmittedAt != nil { return }
             }
             session.requests[id] = AttentionRequest(id: id, kind: kind, evidence: evidence, updatedAt: event.timestamp, turnID: event.turnID)
+            session.requests[id]?.creationEventID = event.id
         }
         func makeUncertain() {
             for id in session.requests.keys {
@@ -196,11 +197,47 @@ public struct RouterState: Codable, Equatable, Sendable {
         }
     }
 
-    public mutating func markReviewed(_ id: String) {
+    public mutating func reviewNotification(_ id: String, keys: [String]) {
+        guard !keys.isEmpty, keys.count <= 64, var session = sessions[id] else { return }
+        let advertised = Set(keys)
+        if session.execution == .idle, let date = session.completionAt,
+           advertised.contains(NotificationPolicy.completionKey(id, date, turnID: session.turnID)) {
+            session.completionReviewed = true
+        }
+        for request in session.requests.values where !request.reviewed && advertised.contains(NotificationPolicy.reviewKey(id, request)) {
+            session.requests[request.id]?.reviewed = true
+        }
+        sessions[id] = session
+    }
+
+    /// Match only the uncertain records the owner saw. Protocol evidence and approvals stay intact.
+    public mutating func clearCheckedReminders(from snapshot: CheckedReminderBatch, now: Date = Date()) {
+        guard var session = sessions[snapshot.sessionID] else { return }
+        for seen in snapshot.questions {
+            guard let current = session.requests[seen.id], current.canManuallyCheck,
+                  current.manuallyCheckedAt == nil, current.creationEventID == seen.creationEventID else { continue }
+            session.requests[seen.id]?.manuallyCheckedAt = now
+        }
+        if let seen = snapshot.notice, let current = session.visibleCoverageNotice,
+           current.id == seen.id, current.observedAt == seen.observedAt {
+            session.protocolCoverageNotice?.manuallyCheckedAt = now
+            session.protocolCoverageNotice?.reviewed = true
+        }
+        sessions[snapshot.sessionID] = session
+    }
+
+    public mutating func markReviewed(_ id: String, asSeen snapshot: AgentSession? = nil) {
         guard var session = sessions[id] else { return }
-        session.completionReviewed = true
-        session.protocolCoverageNotice?.reviewed = true
-        for key in session.requests.keys { session.requests[key]?.reviewed = true }
+        let seen = snapshot ?? session
+        guard seen.id == id else { return }
+        if seen.completionAt == session.completionAt { session.completionReviewed = true }
+        if let notice = seen.protocolCoverageNotice, notice.id == session.protocolCoverageNotice?.id,
+           notice.observedAt == session.protocolCoverageNotice?.observedAt {
+            session.protocolCoverageNotice?.reviewed = true
+        }
+        for (key, request) in seen.requests where session.requests[key] == request {
+            session.requests[key]?.reviewed = true
+        }
         sessions[id] = session
     }
 }

@@ -95,7 +95,7 @@ public struct AgentEvent: Codable, Equatable, Sendable {
         }
         if let nativeClientVersion {
             guard source == "codex-protocol", protocolBinding != nil,
-                  BridgeCompatibility.supportedVersions.contains(nativeClientVersion) else { throw RouterError.invalidEvent }
+                  BridgeCompatibility.eligibleVersion(nativeClientVersion) else { throw RouterError.invalidEvent }
         }
         if coverageIssue != nil {
             guard kind == .activity, source == "codex-protocol", protocolBinding != nil, requestID == id,
@@ -128,9 +128,27 @@ public struct AttentionRequest: Codable, Equatable, Identifiable, Sendable {
     public var turnID: String?
     public var reviewed = false
     public var answerSubmittedAt: Date?
+    public var manuallyCheckedAt: Date?
+    public var creationEventID: String?
+    public var canManuallyCheck: Bool {
+        kind == .question && evidence == .unknown && answerSubmittedAt == nil
+    }
     public init(id: String, kind: RequestKind, evidence: Evidence, updatedAt: Date, turnID: String? = nil, reviewed: Bool = false, answerSubmittedAt: Date? = nil) {
         self.id = id; self.kind = kind; self.evidence = evidence; self.updatedAt = updatedAt; self.turnID = turnID; self.reviewed = reviewed
         self.answerSubmittedAt = answerSubmittedAt
+    }
+}
+
+/// The exact reminders displayed when a user starts checking one original session.
+public struct CheckedReminderBatch: Sendable {
+    public let sessionID: String
+    let questions: [AttentionRequest]
+    let notice: ProtocolCoverageNotice?
+
+    public init(_ session: AgentSession) {
+        sessionID = session.id
+        questions = session.uncertainQuestions
+        notice = session.visibleCoverageNotice
     }
 }
 
@@ -164,7 +182,14 @@ public struct AgentSession: Codable, Equatable, Identifiable, Sendable {
     public var outstanding: [AttentionRequest] {
         requests.values.filter { $0.evidence.outstanding }.sorted { $0.updatedAt < $1.updatedAt }
     }
-    public var needsAttention: Bool { !outstanding.isEmpty || (completionAt != nil && !completionReviewed) || execution == .interrupted || protocolGapAt != nil || protocolCoverageNotice?.reviewed == false }
+    public var visibleOutstanding: [AttentionRequest] {
+        outstanding.filter { !$0.canManuallyCheck || $0.manuallyCheckedAt == nil }
+    }
+    public var visibleCoverageNotice: ProtocolCoverageNotice? {
+        guard let notice = protocolCoverageNotice, notice.manuallyCheckedAt == nil else { return nil }
+        return notice
+    }
+    public var needsAttention: Bool { !visibleOutstanding.isEmpty || (completionAt != nil && !completionReviewed) || execution == .interrupted || protocolGapAt != nil || visibleCoverageNotice?.reviewed == false }
     public var queuedQuestions: [AttentionRequest] {
         outstanding.filter { $0.kind == .question && $0.answerSubmittedAt == nil && $0.evidence != .unknown }
     }
@@ -172,14 +197,14 @@ public struct AgentSession: Codable, Equatable, Identifiable, Sendable {
         outstanding.filter { $0.kind == .question && $0.answerSubmittedAt != nil }
     }
     public var uncertainQuestions: [AttentionRequest] {
-        outstanding.filter { $0.kind == .question && $0.answerSubmittedAt == nil && $0.evidence == .unknown }
+        visibleOutstanding.filter(\.canManuallyCheck)
     }
     public var priority: Int {
         if outstanding.contains(where: { $0.kind == .approval && $0.evidence == .confirmed }) { return 0 }
         if !queuedQuestions.isEmpty { return 1 }
-        if outstanding.contains(where: { $0.kind == .approval && $0.evidence == .observed }) || execution == .interrupted || protocolGapAt != nil || protocolCoverageNotice?.reviewed == false { return 2 }
+        if outstanding.contains(where: { $0.kind == .approval && $0.evidence == .observed }) || execution == .interrupted || protocolGapAt != nil || visibleCoverageNotice?.reviewed == false { return 2 }
         if completionAt != nil && !completionReviewed { return 3 }
-        if !outstanding.isEmpty { return 4 }
+        if !visibleOutstanding.isEmpty { return 4 }
         return execution == .running ? 5 : 6
     }
     public init(id: String, project: String, terminal: TerminalIdentity? = nil) {

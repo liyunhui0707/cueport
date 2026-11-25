@@ -40,7 +40,7 @@ public struct CodexProtocolObserver {
                 recoveryTurns: [String: String] = [:]) {
         self.binding = binding; self.project = String(project.prefix(128))
         self.workerBuildUUID = MachOBuildIdentity.canonicalUUID(workerBuildUUID)
-        self.nativeClientVersion = nativeClientVersion.flatMap { BridgeCompatibility.supportedVersions.contains($0) ? $0 : nil }
+        self.nativeClientVersion = nativeClientVersion.flatMap { BridgeCompatibility.eligibleVersion($0) ? $0 : nil }
         self.recoveryTurns = Dictionary(uniqueKeysWithValues: recoveryTurns.filter {
             !$0.key.isEmpty && $0.key.utf8.count <= 256 && !$0.value.isEmpty && $0.value.utf8.count <= 256
         }.prefix(128).map { ($0.key, $0.value) })

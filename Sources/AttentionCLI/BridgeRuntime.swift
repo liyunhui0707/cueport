@@ -128,7 +128,7 @@ enum BridgeRuntime {
             terminal: terminal, dataRoot: root, project: URL(fileURLWithPath: FileManager.default.currentDirectoryPath).lastPathComponent,
             nativeClientVersion: nativeVersion,
             startupPicker: launch.permitsStartupPickerHandoff ? true : nil,
-            nativeExecutable: invocation.nativeExecutable)
+            nativeExecutable: nativeCodex)
         try writePrivate(JSONEncoder().encode(ticket), to: ticketURL)
         let worker = Process()
         worker.executableURL = URL(fileURLWithPath: CommandLine.arguments[0]).standardizedFileURL
@@ -176,7 +176,13 @@ enum BridgeRuntime {
     }
     @discardableResult static func requireReviewedNativeExecutable(_ path: String) throws -> String {
         do { return try NativeCodex.verifyVersion(path) }
-        catch NativeCodex.Failure.probeFailed { throw BridgeFailure.nativeDependency }
+        catch let err as NativeCodex.Failure {
+            switch err {
+            case .incompatibleProtocol: throw err
+            case .probeFailed: throw BridgeFailure.nativeDependency
+            default: throw BridgeFailure.version
+            }
+        }
         catch { throw BridgeFailure.version }
     }
     static func worker(_ file: URL) throws {
@@ -187,7 +193,7 @@ enum BridgeRuntime {
               ticket.expected.uid == getuid(), ticket.expected.pid == getppid(),
               ticket.terminal.guid != nil, ticket.dataRoot.standardizedFileURL.path != LocalStore.defaultRoot.standardizedFileURL.path else { throw RouterError.unverifiedOrigin }
         defer { cleanup(directory) }
-        guard BridgeCompatibility.supportedVersions.contains(ticket.nativeClientVersion) else { throw BridgeFailure.version }
+        guard BridgeCompatibility.eligibleVersion(ticket.nativeClientVersion) else { throw BridgeFailure.version }
         let native = ticket.nativeExecutable ?? nativeCodex
         try validateNativeExecutable(native)
         signal(SIGPIPE, SIG_IGN); signal(SIGTERM, stopBridge); signal(SIGINT, stopBridge); signal(SIGHUP, stopBridge)
@@ -254,8 +260,15 @@ enum BridgeRuntime {
         upstream.environment = CodexInstallation(nativeExecutable: ticket.nativeExecutable ?? nativeCodex)
             .environment(inheriting: ProcessInfo.processInfo.environment)
         upstream.standardInput = input; upstream.standardOutput = outputPipe; upstream.standardError = FileHandle.nullDevice
+        func recordEnd(_ reason: String) {
+            let end = ConnectionDiagnostics.TransportEnd(reason: reason, date: Date())
+            if let bytes = try? JSONEncoder().encode(end) {
+                try? writePrivate(bytes, to: ticket.dataRoot.appendingPathComponent(ConnectionDiagnostics.transportFilename))
+            }
+        }
         do { try upstream.run() }
         catch {
+            recordEnd("proxy-launch-failed")
             let result: [String: Any] = ["bridge_connection": connectionID, "status": "transport-failed",
                 "ended_by": "proxy-launch-failed", "accepted_connections": connectionIndex,
                 "recorded_at": ISO8601DateFormatter().string(from: Date()),
@@ -305,7 +318,10 @@ enum BridgeRuntime {
                 to: ticket.dataRoot.appendingPathComponent("bridge-" + connectionID + ".json"))
         }
         receipt("connected")
-        defer { receipt(completedNormally ? "disconnected" : "transport-failed") }
+        defer {
+            receipt(completedNormally ? "disconnected" : "transport-failed")
+            recordEnd(endReason)
+        }
         var lastProbe = Date.distantPast
         let end: BridgeRelay.EndReason
         do { end = try BridgeRelay.run(clientRead: client, clientWrite: client,

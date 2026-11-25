@@ -4,6 +4,7 @@ public struct NotificationPlan: Equatable, Sendable {
     public let eventID: String
     public let identifier: String
     public let receiptIDs: [String]
+    public let reviewKeys: [String]
     public let kind: EventKind
     public let questionCount: Int
     public let sourceInstance: String
@@ -24,39 +25,56 @@ public enum NotificationPolicy {
             StableDigest.hex((try? JSONEncoder().encode(parts)) ?? Data())
         }
         var keys: [String] = []
+        var reviewKeys: [String] = []
+        func include(_ receipt: String, review: String? = nil) {
+            guard submitted[receipt] == nil else { return }
+            keys.append(receipt)
+            if let review { reviewKeys.append(review) }
+        }
         switch event.kind {
         case .approvalRequested:
             guard event.source == "codex-protocol", event.protocolBinding != nil,
                   let id = event.requestID, let request = session.requests[id],
                   request.kind == .approval, request.evidence == .observed else { return nil }
-            keys = [key(["approval-delivered", session.id, id])]
+            include(key(["approval-delivered", session.id, id]), review: reviewKey(session.id, request))
         case .questionQueued:
             for id in Set(event.questionIDs).sorted() {
                 guard let request = session.requests[id], request.kind == .question, request.answerSubmittedAt == nil,
                       request.evidence == .observed || request.evidence == .confirmed else { continue }
-                keys.append(key(["question", session.id, id]))
+                include(key(["question", session.id, id]), review: reviewKey(session.id, request))
             }
         case .humanApprovalPending:
             guard event.source == "codex-protocol", let id = event.requestID,
                   let request = session.requests[id], request.kind == .approval,
                   request.evidence == .confirmed else { return nil }
-            keys = [key(["human-approval", session.id, id])]
+            include(key(["human-approval", session.id, id]), review: reviewKey(session.id, request))
         case .turnStopped:
-            guard session.execution == .idle, session.completionAt == event.timestamp,
+            guard session.execution == .idle, session.completionAt == event.timestamp, session.turnID == event.turnID,
                   !session.completionReviewed else { return nil }
-            keys = [key(["turn-stopped", session.id, event.turnID ?? event.id])]
+            include(key(["turn-stopped", session.id, event.turnID ?? event.id]),
+                    review: completionKey(session.id, event.timestamp, turnID: event.turnID))
         case .interrupted:
             guard session.execution == .interrupted, session.executionAt == event.timestamp else { return nil }
-            keys = [key(["interrupted", session.id, event.turnID ?? event.id])]
+            include(key(["interrupted", session.id, event.turnID ?? event.id]))
         default:
             // Hook PermissionRequest is early evidence, including automatic review.
             // A delivered protocol request stays explicitly unconfirmed too.
             return nil
         }
-        keys = keys.filter { submitted[$0] == nil }
         guard !keys.isEmpty else { return nil }
-        return NotificationPlan(eventID: event.id, identifier: "aar-" + key(keys), receiptIDs: keys, kind: event.kind,
+        return NotificationPlan(eventID: event.id, identifier: "aar-" + key(keys), receiptIDs: keys, reviewKeys: reviewKeys, kind: event.kind,
             questionCount: event.kind == .questionQueued ? keys.count : 0, sourceInstance: sourceInstance)
+    }
+
+    // An old banner can only review the state it advertised, even after restart.
+    static func reviewKey(_ session: String, _ request: AttentionRequest) -> String {
+        versionKey([session, request.kind.rawValue, request.id, request.evidence.rawValue] + [request.turnID].compactMap { $0 }, request.updatedAt)
+    }
+    static func completionKey(_ session: String, _ date: Date, turnID: String?) -> String {
+        versionKey([session, "completion"] + [turnID].compactMap { $0 }, date)
+    }
+    private static func versionKey(_ fields: [String], _ date: Date) -> String {
+        StableDigest.hex((try? JSONEncoder().encode(fields + [String(date.timeIntervalSinceReferenceDate.bitPattern)])) ?? Data())
     }
 
     /// macOS accepted the submission; this is not proof of delivery or review.

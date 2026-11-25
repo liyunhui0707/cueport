@@ -39,6 +39,19 @@ import AppKit
                 try save(DashboardView(model: coverage).environment(\.colorScheme, dark ? .dark : .light), to: directory.appendingPathComponent("interaction-coverage-\(style).png"))
                 try save(UtilityView(model: coverage, settings: false).workerBuildContent.padding(28).frame(width: 540).background(Design.background)
                     .environment(\.colorScheme, dark ? .dark : .light), to: directory.appendingPathComponent("interaction-details-\(style).png"))
+                if var example = coverage.state.sessions.values.first(where: { $0.visibleCoverageNotice != nil }) {
+                    example.project = "Example project"
+                    example.execution = .idle
+                    for index in 1...17 {
+                        let key = "sample-question-\(index)"
+                        example.requests[key] = .init(id: key, kind: .question, evidence: .unknown, updatedAt: .distantPast)
+                    }
+                    coverage.state.sessions = [example.id: example]
+                    let panel = DashboardView(model: coverage).environment(\.colorScheme, dark ? .dark : .light)
+                    try save(panel, to: directory.appendingPathComponent("reminder-before-\(style).png"))
+                    coverage.clearCheckedReminders(example)
+                    try save(panel, to: directory.appendingPathComponent("reminder-after-\(style).png"))
+                }
                 let delivery = RouterModel(demo: true)
                 delivery.buildStatus = .init(running: "00000000-0000-0000-0000-000000000001", onDisk: "00000000-0000-0000-0000-000000000002")
                 delivery.snapshotBytes = 57 * 1_048_576

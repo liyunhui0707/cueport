@@ -1,11 +1,12 @@
 {
-  "version": "0.1.0-alpha.5",
-  "release_url": "https://github.com/liyunhui0707/cueport/releases/tag/v0.1.0-alpha.5",
-  "download_url": "https://github.com/liyunhui0707/cueport/releases/download/v0.1.0-alpha.5/Cueport-0.1.0-alpha.5-macos-arm64.zip",
-  "sha256": "f76a2f2ab935ab6440c594993952e5c5f24714f4e0533cf46d74f975f3f9b905",
+  "version": "0.1.0-alpha.8",
+  "release_url": "https://github.com/liyunhui0707/cueport/releases/tag/v0.1.0-alpha.8",
+  "download_url": "https://github.com/liyunhui0707/cueport/releases/download/v0.1.0-alpha.8/Cueport-0.1.0-alpha.8-macos-arm64.zip",
+  "sha256": "030d388ceb4509cf4055b7fac27bb9ebfdac52cc051884ba047a75038d8df190",
   "supported_codex": [
     "0.169.0",
-    "0.170.0"
+    "0.170.0",
+    "0.172.0"
   ],
   "notice": "Cueport 实验性预发布：需要显式连接 Codex；原生通知、Spaces 和完整无障碍验收仍有缺口，长测结果单独记录。请阅读版本说明。",
   "entry_description": "Cueport 是独立 macOS 应用，提供菜单栏入口。可在 Settings 中开启 Show application in Dock，显示 Dock 图标。",
